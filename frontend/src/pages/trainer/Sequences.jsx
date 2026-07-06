@@ -1,0 +1,69 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import client from '../../api/client';
+import { format } from 'date-fns';
+
+export default function Sequences() {
+  const navigate = useNavigate();
+  const [sequences, setSequences] = useState([]);
+  const [weeks, setWeeks] = useState([]);
+  const [selectedWeek, setSelectedWeek] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    client.get('/sequences/weeks').then(r => {
+      setWeeks(r.data);
+      if (r.data.length > 0) setSelectedWeek(r.data[0]);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!selectedWeek) return;
+    setLoading(true);
+    client.get(`/sequences?week=${selectedWeek}`).then(r => setSequences(r.data)).finally(() => setLoading(false));
+  }, [selectedWeek]);
+
+  return (
+    <div className="page">
+      <div className="page-header">
+        <h1 className="page-title">Sequences</h1>
+      </div>
+
+      {weeks.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 16 }}>
+          {weeks.map(w => (
+            <button
+              key={w}
+              onClick={() => setSelectedWeek(w)}
+              style={{
+                padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
+                background: selectedWeek === w ? 'var(--primary)' : 'var(--white)',
+                color: selectedWeek === w ? '#fff' : 'var(--text)',
+                border: '1.5px solid ' + (selectedWeek === w ? 'var(--primary)' : 'var(--border)'),
+                cursor: 'pointer'
+              }}
+            >
+              {format(new Date(w), 'd MMM')}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {loading ? <div className="loading">Loading…</div> : sequences.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">⊡</div>
+          <p>No sequences for this week</p>
+        </div>
+      ) : sequences.map(seq => (
+        <div key={seq.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sequences/${seq.id}`)}>
+          <div className="list-item-left">
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase' }}>{seq.status}</span>
+            <div className="list-item-title">{seq.topic}</div>
+            <div className="list-item-sub">{format(new Date(seq.scheduled_date), 'EEE, d MMM')} · {seq.trainer_name}</div>
+          </div>
+          <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1l6 6-6 6" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round"/></svg>
+        </div>
+      ))}
+    </div>
+  );
+}
