@@ -1,43 +1,44 @@
 const router = require('express').Router();
-const db = require('../db/db');
+const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { sendToUser } = require('../utils/push');
 
 // Trainer: my leaves
-router.get('/my', authenticate, requireRole('trainer'), (req, res) => {
-  const leaves = db.prepare(`
-    SELECT l.*, u.name AS reviewed_by_name
-    FROM leaves l LEFT JOIN users u ON l.reviewed_by = u.id
-    WHERE l.trainer_id = ? ORDER BY l.created_at DESC
-  `).all(req.user.id);
-  res.json(leaves);
+router.get('/my', authenticate, requireRole('trainer'), async (req, res) => {
+  const leaves = await prisma.leave.findMany({
+    where: { trainer_id: req.user.id },
+    include: { reviewer: { select: { name: true } } },
+    orderBy: { created_at: 'desc' }
+  });
+  res.json(leaves.map(({ reviewer, ...l }) => ({ ...l, reviewed_by_name: reviewer?.name ?? null })));
 });
 
 // Admin: all leaves
-router.get('/', authenticate, requireRole('super_admin'), (req, res) => {
+router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
   const { status } = req.query;
-  let query = `SELECT l.*, t.name AS trainer_name, u.name AS reviewed_by_name
-    FROM leaves l
-    LEFT JOIN users t ON l.trainer_id = t.id
-    LEFT JOIN users u ON l.reviewed_by = u.id
-    WHERE 1=1`;
-  const params = [];
-  if (status) { query += ' AND l.status = ?'; params.push(status); }
-  query += ' ORDER BY l.created_at DESC';
-  res.json(db.prepare(query).all(...params));
+  const leaves = await prisma.leave.findMany({
+    where: status ? { status } : {},
+    include: { trainer: { select: { name: true } }, reviewer: { select: { name: true } } },
+    orderBy: { created_at: 'desc' }
+  });
+  res.json(leaves.map(({ trainer, reviewer, ...l }) => ({
+    ...l,
+    trainer_name: trainer?.name ?? null,
+    reviewed_by_name: reviewer?.name ?? null
+  })));
 });
 
 // Trainer: apply for leave
-router.post('/', authenticate, requireRole('trainer'), (req, res) => {
+router.post('/', authenticate, requireRole('trainer'), async (req, res) => {
   const { from_date, to_date, reason } = req.body;
   if (!from_date || !to_date || !reason) return res.status(400).json({ error: 'from_date, to_date, reason required' });
   if (from_date > to_date) return res.status(400).json({ error: 'from_date must be before to_date' });
 
-  const result = db.prepare(
-    'INSERT INTO leaves (trainer_id, from_date, to_date, reason) VALUES (?, ?, ?, ?)'
-  ).run(req.user.id, from_date, to_date, reason.trim());
+  const leave = await prisma.leave.create({
+    data: { trainer_id: req.user.id, from_date, to_date, reason: reason.trim() }
+  });
 
-  res.status(201).json({ id: result.lastInsertRowid });
+  res.status(201).json({ id: leave.id });
 });
 
 // Admin: approve or reject
@@ -45,13 +46,15 @@ router.patch('/:id/review', authenticate, requireRole('super_admin'), async (req
   const { status, admin_note } = req.body;
   if (!['approved', 'rejected'].includes(status)) return res.status(400).json({ error: 'status must be approved or rejected' });
 
-  const leave = db.prepare('SELECT * FROM leaves WHERE id = ?').get(req.params.id);
+  const id = parseInt(req.params.id);
+  const leave = await prisma.leave.findUnique({ where: { id } });
   if (!leave) return res.status(404).json({ error: 'Leave not found' });
 
-  db.prepare(`UPDATE leaves SET status=?, admin_note=?, reviewed_by=?, reviewed_at=datetime('now'), updated_at=datetime('now') WHERE id=?`)
-    .run(status, admin_note || null, req.user.id, req.params.id);
+  await prisma.leave.update({
+    where: { id },
+    data: { status, admin_note: admin_note || null, reviewed_by: req.user.id, reviewed_at: new Date() }
+  });
 
-  const trainer = db.prepare('SELECT name FROM users WHERE id = ?').get(leave.trainer_id);
   await sendToUser(leave.trainer_id, {
     title: `Leave ${status === 'approved' ? 'Approved' : 'Rejected'}`,
     body: `Your leave from ${leave.from_date} to ${leave.to_date} has been ${status}.${admin_note ? ' Note: ' + admin_note : ''}`,
@@ -62,13 +65,14 @@ router.patch('/:id/review', authenticate, requireRole('super_admin'), async (req
 });
 
 // Trainer: cancel pending leave
-router.delete('/:id', authenticate, requireRole('trainer'), (req, res) => {
-  const leave = db.prepare('SELECT * FROM leaves WHERE id = ?').get(req.params.id);
+router.delete('/:id', authenticate, requireRole('trainer'), async (req, res) => {
+  const id = parseInt(req.params.id);
+  const leave = await prisma.leave.findUnique({ where: { id } });
   if (!leave) return res.status(404).json({ error: 'Not found' });
   if (leave.trainer_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
   if (leave.status !== 'pending') return res.status(400).json({ error: 'Can only cancel pending leaves' });
 
-  db.prepare('DELETE FROM leaves WHERE id = ?').run(req.params.id);
+  await prisma.leave.delete({ where: { id } });
   res.json({ success: true });
 });
 

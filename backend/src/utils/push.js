@@ -1,5 +1,5 @@
 const webpush = require('web-push');
-const db = require('../db/db');
+const prisma = require('../db/db');
 
 webpush.setVapidDetails(
   process.env.VAPID_EMAIL,
@@ -7,53 +7,33 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY
 );
 
-async function sendToUser(userId, payload) {
-  const subs = db.prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').all(userId);
-  const results = await Promise.allSettled(
+async function dispatch(subs, payload) {
+  return Promise.allSettled(
     subs.map(row =>
       webpush.sendNotification(JSON.parse(row.subscription_json), JSON.stringify(payload))
         .catch(err => {
           if (err.statusCode === 410 || err.statusCode === 404) {
-            db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(row.endpoint);
+            prisma.pushSubscription.deleteMany({ where: { endpoint: row.endpoint } });
           }
           throw err;
         })
     )
   );
-  return results;
+}
+
+async function sendToUser(userId, payload) {
+  const subs = await prisma.pushSubscription.findMany({ where: { user_id: userId } });
+  return dispatch(subs, payload);
 }
 
 async function sendToAll(payload) {
-  const subs = db.prepare('SELECT * FROM push_subscriptions').all();
-  const results = await Promise.allSettled(
-    subs.map(row =>
-      webpush.sendNotification(JSON.parse(row.subscription_json), JSON.stringify(payload))
-        .catch(err => {
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(row.endpoint);
-          }
-          throw err;
-        })
-    )
-  );
-  return results;
+  const subs = await prisma.pushSubscription.findMany();
+  return dispatch(subs, payload);
 }
 
 async function sendToUsers(userIds, payload) {
-  const placeholders = userIds.map(() => '?').join(',');
-  const subs = db.prepare(`SELECT * FROM push_subscriptions WHERE user_id IN (${placeholders})`).all(...userIds);
-  const results = await Promise.allSettled(
-    subs.map(row =>
-      webpush.sendNotification(JSON.parse(row.subscription_json), JSON.stringify(payload))
-        .catch(err => {
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            db.prepare('DELETE FROM push_subscriptions WHERE endpoint = ?').run(row.endpoint);
-          }
-          throw err;
-        })
-    )
-  );
-  return results;
+  const subs = await prisma.pushSubscription.findMany({ where: { user_id: { in: userIds } } });
+  return dispatch(subs, payload);
 }
 
 module.exports = { sendToUser, sendToAll, sendToUsers };

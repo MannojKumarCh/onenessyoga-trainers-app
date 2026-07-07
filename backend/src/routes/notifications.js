@@ -1,26 +1,26 @@
 const router = require('express').Router();
-const db = require('../db/db');
+const prisma = require('../db/db');
 const { authenticate } = require('../middleware/auth');
 
 // Save push subscription
-router.post('/subscribe', authenticate, (req, res) => {
+router.post('/subscribe', authenticate, async (req, res) => {
   const { subscription } = req.body;
   if (!subscription || !subscription.endpoint) return res.status(400).json({ error: 'subscription required' });
 
-  db.prepare(`
-    INSERT INTO push_subscriptions (user_id, endpoint, subscription_json)
-    VALUES (?, ?, ?)
-    ON CONFLICT(endpoint) DO UPDATE SET subscription_json = excluded.subscription_json
-  `).run(req.user.id, subscription.endpoint, JSON.stringify(subscription));
+  await prisma.pushSubscription.upsert({
+    where: { endpoint: subscription.endpoint },
+    update: { subscription_json: JSON.stringify(subscription) },
+    create: { user_id: req.user.id, endpoint: subscription.endpoint, subscription_json: JSON.stringify(subscription) }
+  });
 
   res.json({ success: true });
 });
 
 // Remove push subscription
-router.post('/unsubscribe', authenticate, (req, res) => {
+router.post('/unsubscribe', authenticate, async (req, res) => {
   const { endpoint } = req.body;
   if (!endpoint) return res.status(400).json({ error: 'endpoint required' });
-  db.prepare('DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?').run(req.user.id, endpoint);
+  await prisma.pushSubscription.deleteMany({ where: { user_id: req.user.id, endpoint } });
   res.json({ success: true });
 });
 

@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  super_admin
+  sequence_creator
+  trainer
+}
+
+enum LeaveStatus {
+  pending
+  approved
+  rejected
+}
+
+enum SequenceStatus {
+  pending
+  uploaded
+}
+
+enum ResourceType {
+  folder
+  link
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  name          String
+  email         String   @unique
+  password_hash String
+  role          Role
+  zoom_link     String?
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  sessions_assigned  Session[]          @relation("SessionTrainer")
+  sessions_created   Session[]          @relation("SessionCreator")
+  leaves             Leave[]            @relation("LeaveTrainer")
+  leaves_reviewed    Leave[]            @relation("LeaveReviewer")
+  sequences_assigned Sequence[]         @relation("SequenceTrainer")
+  sequences_created  Sequence[]         @relation("SequenceCreator")
+  resources_created  Resource[]
+  push_subscriptions PushSubscription[]
+
+  @@map("users")
+}
+
+model Session {
+  id                  Int       @id @default(autoincrement())
+  title               String    @default("Daily Session")
+  scheduled_date      String
+  scheduled_time      String
+  session_type        String?   @default("BKP")
+  assigned_trainer_id Int?
+  assigned_trainer    User?     @relation("SessionTrainer", fields: [assigned_trainer_id], references: [id], onDelete: SetNull)
+  zoom_link           String?
+  notes               String?
+  is_completed        Boolean   @default(false)
+  completed_at        DateTime?
+  created_by          Int?
+  creator             User?     @relation("SessionCreator", fields: [created_by], references: [id])
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  @@index([scheduled_date])
+  @@index([assigned_trainer_id])
+  @@map("sessions")
+}
+
+model Leave {
+  id          Int         @id @default(autoincrement())
+  trainer_id  Int
+  trainer     User        @relation("LeaveTrainer", fields: [trainer_id], references: [id], onDelete: Cascade)
+  from_date   String
+  to_date     String
+  reason      String
+  status      LeaveStatus @default(pending)
+  admin_note  String?
+  reviewed_by Int?
+  reviewer    User?       @relation("LeaveReviewer", fields: [reviewed_by], references: [id])
+  reviewed_at DateTime?
+  created_at  DateTime    @default(now())
+  updated_at  DateTime    @updatedAt
+
+  @@index([trainer_id])
+  @@map("leaves")
+}
+
+model Sequence {
+  id                  Int            @id @default(autoincrement())
+  week_start_date     String
+  scheduled_date      String
+  topic               String
+  assigned_trainer_id Int
+  assigned_trainer    User           @relation("SequenceTrainer", fields: [assigned_trainer_id], references: [id])
+  google_sheet_link   String?
+  instructions        String?
+  status              SequenceStatus @default(pending)
+  created_by          Int
+  creator             User           @relation("SequenceCreator", fields: [created_by], references: [id])
+  uploaded_at         DateTime?
+  notified_trainer_at DateTime?
+  notified_team_at    DateTime?
+  created_at          DateTime       @default(now())
+  updated_at          DateTime       @updatedAt
+
+  @@index([week_start_date])
+  @@index([assigned_trainer_id])
+  @@map("sequences")
+}
+
+model Resource {
+  id            Int          @id @default(autoincrement())
+  name          String
+  type          ResourceType
+  parent_id     Int?
+  parent        Resource?    @relation("ResourceChildren", fields: [parent_id], references: [id], onDelete: Cascade)
+  children      Resource[]   @relation("ResourceChildren")
+  url           String?
+  thumbnail_url String?
+  sort_order    Int          @default(0)
+  created_by    Int?
+  creator       User?        @relation(fields: [created_by], references: [id])
+  created_at    DateTime     @default(now())
+  updated_at    DateTime     @updatedAt
+
+  @@map("resources")
+}
+
+model PushSubscription {
+  id                Int      @id @default(autoincrement())
+  user_id           Int
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  endpoint          String   @unique
+  subscription_json String
+  created_at        DateTime @default(now())
+
+  @@map("push_subscriptions")
+}

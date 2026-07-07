@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const prisma = require('./db/db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,3 +20,11 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
 app.listen(PORT, () => console.log(`Oneness Yoga API running on port ${PORT}`));
+
+async function shutdown() {
+  await prisma.$disconnect();
+  process.exit(0);
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

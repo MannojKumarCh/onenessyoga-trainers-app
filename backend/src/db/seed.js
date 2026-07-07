@@ -1,22 +1,31 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
-const db = require('./db');
+const prisma = require('./db');
 
 const email = process.argv[2] || 'admin@oneness.yoga';
 const password = process.argv[3] || 'admin1234';
 const name = process.argv[4] || 'Super Admin';
 
-const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-if (existing) {
-  console.log(`User ${email} already exists (id: ${existing.id})`);
-  process.exit(0);
+async function main() {
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    console.log(`User ${email} already exists (id: ${existing.id})`);
+    return;
+  }
+
+  const hash = bcrypt.hashSync(password, 10);
+  const user = await prisma.user.create({
+    data: { name, email, password_hash: hash, role: 'super_admin' }
+  });
+
+  console.log(`Created super_admin: ${email} (id: ${user.id})`);
+  console.log('Password:', password);
+  console.log('CHANGE THIS PASSWORD after first login!');
 }
 
-const hash = bcrypt.hashSync(password, 10);
-const result = db.prepare(
-  'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)'
-).run(name, email, hash, 'super_admin');
-
-console.log(`Created super_admin: ${email} (id: ${result.lastInsertRowid})`);
-console.log('Password:', password);
-console.log('CHANGE THIS PASSWORD after first login!');
+main()
+  .catch(e => {
+    console.error(e);
+    process.exitCode = 1;
+  })
+  .finally(() => prisma.$disconnect());
