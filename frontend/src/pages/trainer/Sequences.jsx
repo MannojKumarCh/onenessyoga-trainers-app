@@ -9,18 +9,20 @@ export default function Sequences() {
   const [weeks, setWeeks] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState('');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     client.get('/sequences/weeks').then(r => {
       setWeeks(r.data);
       if (r.data.length > 0) setSelectedWeek(r.data[0]);
-    });
+      else setLoading(false);
+    }).catch(() => { setError(true); setLoading(false); });
   }, []);
 
   useEffect(() => {
     if (!selectedWeek) return;
     setLoading(true);
-    client.get(`/sequences?week=${selectedWeek}`).then(r => setSequences(r.data)).finally(() => setLoading(false));
+    client.get(`/sequences?week=${selectedWeek}`).then(r => setSequences(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
   }, [selectedWeek]);
 
   return (
@@ -49,7 +51,9 @@ export default function Sequences() {
         </div>
       )}
 
-      {loading ? <div className="loading">Loading…</div> : sequences.length === 0 ? (
+      {loading ? <div className="loading">Loading…</div> : error ? (
+        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load sequences. Please try again.</p></div>
+      ) : sequences.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">⊡</div>
           <p>No sequences for this week</p>

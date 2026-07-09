@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import client from '../../api/client';
-import { format, isToday, isTomorrow } from 'date-fns';
+import { format } from 'date-fns';
+import { dayLabel } from '../../utils/date';
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -11,6 +12,7 @@ export default function Dashboard() {
   const [pendingLeaves, setPendingLeaves] = useState([]);
   const [sequences, setSequences] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -23,17 +25,11 @@ export default function Dashboard() {
       // Latest week's sequences
       const weeks = [...new Set(seq.data.map(x => x.week_start_date))].sort().reverse();
       setSequences(seq.data.filter(x => x.week_start_date === weeks[0]).slice(0, 3));
-    }).finally(() => setLoading(false));
+    }).catch(() => setError(true)).finally(() => setLoading(false));
   }, []);
 
-  function dayLabel(dateStr) {
-    const d = new Date(dateStr);
-    if (isToday(d)) return 'Today';
-    if (isTomorrow(d)) return 'Tomorrow';
-    return format(d, 'EEE, d MMM');
-  }
-
   if (loading) return <div className="loading">Loading…</div>;
+  if (error) return <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load your dashboard. Please try again.</p></div>;
 
   return (
     <div className="page">

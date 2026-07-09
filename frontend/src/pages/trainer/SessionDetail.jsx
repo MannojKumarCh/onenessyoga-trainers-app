@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { format } from 'date-fns';
+import Modal from '../../components/Modal';
 
 export default function SessionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [session, setSession] = useState(null);
+  const [loadError, setLoadError] = useState(false);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
@@ -16,7 +18,7 @@ export default function SessionDetail() {
     client.get(`/sessions/${id}`).then(r => {
       setSession(r.data);
       setNotes(r.data.notes || '');
-    });
+    }).catch(() => setLoadError(true));
   }, [id]);
 
   async function saveNotes() {
@@ -31,6 +33,7 @@ export default function SessionDetail() {
     navigate(-1);
   }
 
+  if (loadError) return <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load this session. Please try again.</p></div>;
   if (!session) return <div className="loading">Loading…</div>;
 
   return (
@@ -92,9 +95,7 @@ export default function SessionDetail() {
       )}
 
       {showConfirm && (
-        <div className="modal-overlay" onClick={() => setShowConfirm(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">Confirm Completion</h3>
+        <Modal title="Confirm Completion" onClose={() => setShowConfirm(false)}>
             <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>Mark this session as completed? This cannot be undone.</p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowConfirm(false)}>Cancel</button>
@@ -102,8 +103,7 @@ export default function SessionDetail() {
                 {completing ? 'Saving…' : 'Confirm'}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

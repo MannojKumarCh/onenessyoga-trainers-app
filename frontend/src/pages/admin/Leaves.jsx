@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
 import client from '../../api/client';
+import Modal from '../../components/Modal';
 
 export default function AdminLeaves() {
   const [leaves, setLeaves] = useState([]);
   const [filter, setFilter] = useState('pending');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [reviewing, setReviewing] = useState(null);
   const [adminNote, setAdminNote] = useState('');
 
   function load() {
     setLoading(true);
+    setError(false);
     const q = filter ? `?status=${filter}` : '';
-    client.get(`/leaves${q}`).then(r => setLeaves(r.data)).finally(() => setLoading(false));
+    client.get(`/leaves${q}`).then(r => setLeaves(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
   }
 
   useEffect(() => { load(); }, [filter]);
@@ -43,7 +46,9 @@ export default function AdminLeaves() {
         ))}
       </div>
 
-      {loading ? <div className="loading">Loading…</div> : leaves.length === 0 ? (
+      {loading ? <div className="loading">Loading…</div> : error ? (
+        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load leaves. Please try again.</p></div>
+      ) : leaves.length === 0 ? (
         <div className="empty-state"><div className="empty-state-icon">📝</div><p>No leaves found</p></div>
       ) : leaves.map(l => (
         <div key={l.id} className="list-item">
@@ -64,9 +69,7 @@ export default function AdminLeaves() {
       ))}
 
       {reviewing && (
-        <div className="modal-overlay" onClick={() => setReviewing(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">Review Leave</h3>
+        <Modal title="Review Leave" onClose={() => setReviewing(null)}>
             <p style={{ color: 'var(--text-secondary)', marginBottom: 4 }}><strong>{reviewing.trainer_name}</strong></p>
             <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 16 }}>{reviewing.from_date} → {reviewing.to_date} · {reviewing.reason}</p>
             <div className="form-group">
@@ -78,8 +81,7 @@ export default function AdminLeaves() {
               <button className="btn btn-danger" style={{ flex: 1 }} onClick={() => review('rejected')}>Reject</button>
               <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => review('approved')}>Approve</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

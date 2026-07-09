@@ -4,12 +4,14 @@ import client from '../../api/client';
 export default function Resources() {
   const [data, setData] = useState({ items: [], breadcrumb: [] });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [folderId, setFolderId] = useState(null);
 
   function load(parentId) {
     setLoading(true);
+    setError(false);
     const q = parentId ? `?parent_id=${parentId}` : '';
-    client.get(`/resources${q}`).then(r => setData(r.data)).finally(() => setLoading(false));
+    client.get(`/resources${q}`).then(r => setData(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
   }
 
   useEffect(() => { load(folderId); }, [folderId]);
@@ -40,13 +42,15 @@ export default function Resources() {
         </div>
       )}
 
-      {loading ? <div className="loading">Loading…</div> : data.items.length === 0 ? (
+      {loading ? <div className="loading">Loading…</div> : error ? (
+        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load resources. Please try again.</p></div>
+      ) : data.items.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">📚</div>
           <p>Nothing here yet</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
           {data.items.map(item => (
             item.type === 'folder' ? (
               <div key={item.id} className="card" style={{ cursor: 'pointer', textAlign: 'center' }} onClick={() => openFolder(item.id)}>

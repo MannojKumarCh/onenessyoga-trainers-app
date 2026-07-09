@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import client from '../../api/client';
+import Modal from '../../components/Modal';
 
 export default function Leaves() {
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ from_date: '', to_date: '', reason: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   function load() {
-    client.get('/leaves/my').then(r => setLeaves(r.data)).finally(() => setLoading(false));
+    client.get('/leaves/my').then(r => setLeaves(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }
 
   useEffect(() => { load(); }, []);
@@ -45,7 +47,9 @@ export default function Leaves() {
         <button className="btn btn-primary" style={{ padding: '8px 16px' }} onClick={() => setShowForm(true)}>+ Apply</button>
       </div>
 
-      {leaves.length === 0 ? (
+      {loadError ? (
+        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load leaves. Please try again.</p></div>
+      ) : leaves.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">📝</div>
           <p>No leave applications yet</p>
@@ -69,9 +73,7 @@ export default function Leaves() {
       ))}
 
       {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">Apply for Leave</h3>
+        <Modal title="Apply for Leave" onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
                 <label className="label">From Date <span style={{ color: 'var(--danger)' }}>*</span></label>
@@ -93,8 +95,7 @@ export default function Leaves() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import client from '../../api/client';
 import { format } from 'date-fns';
+import { groupByDate } from '../../utils/date';
+import Modal from '../../components/Modal';
 
 const EMPTY_SESSION = { title: 'Daily Session', scheduled_date: '', scheduled_time: '06:15', session_type: 'BKP', assigned_trainer_id: '', zoom_link: '' };
 
@@ -8,6 +10,7 @@ export default function AdminSessions() {
   const [sessions, setSessions] = useState([]);
   const [trainers, setTrainers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_SESSION);
   const [submitting, setSubmitting] = useState(false);
@@ -16,13 +19,14 @@ export default function AdminSessions() {
 
   function load() {
     setLoading(true);
+    setLoadError(false);
     Promise.all([
       client.get(`/sessions?from=${dateFrom}`),
       client.get('/users/trainers')
     ]).then(([s, t]) => {
       setSessions(s.data);
       setTrainers(t.data);
-    }).finally(() => setLoading(false));
+    }).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }
 
   useEffect(() => { load(); }, [dateFrom]);
@@ -50,11 +54,7 @@ export default function AdminSessions() {
     load();
   }
 
-  const grouped = sessions.reduce((acc, s) => {
-    if (!acc[s.scheduled_date]) acc[s.scheduled_date] = [];
-    acc[s.scheduled_date].push(s);
-    return acc;
-  }, {});
+  const grouped = groupByDate(sessions);
 
   return (
     <div className="page">
@@ -68,7 +68,9 @@ export default function AdminSessions() {
         <input className="input" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
       </div>
 
-      {loading ? <div className="loading">Loading…</div> : Object.keys(grouped).length === 0 ? (
+      {loading ? <div className="loading">Loading…</div> : loadError ? (
+        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load sessions. Please try again.</p></div>
+      ) : Object.keys(grouped).length === 0 ? (
         <div className="empty-state"><div className="empty-state-icon">📅</div><p>No sessions found</p></div>
       ) : Object.entries(grouped).map(([date, items]) => (
         <div key={date}>
@@ -76,7 +78,9 @@ export default function AdminSessions() {
           {items.map(s => (
             <div key={s.id} className="list-item">
               <div className="list-item-left">
-                <div className="list-item-title">{s.title} {s.is_completed ? '✓' : ''}</div>
+                <div className="list-item-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {s.title} {s.is_completed && <span className="badge badge-approved">Done</span>}
+                </div>
                 <div className="list-item-sub">{s.scheduled_time} · {s.trainer_name || 'Unassigned'}</div>
               </div>
               <button onClick={() => deleteSession(s.id)} style={{ color: 'var(--danger)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
@@ -86,9 +90,7 @@ export default function AdminSessions() {
       ))}
 
       {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">Add Session</h3>
+        <Modal title="Add Session" onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
                 <label className="label">Title</label>
@@ -127,8 +129,7 @@ export default function AdminSessions() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

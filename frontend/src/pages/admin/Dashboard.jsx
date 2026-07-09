@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -18,8 +19,10 @@ export default function AdminDashboard() {
         pendingLeaves: leaves.data.length,
         todaySessions: sessions.data.filter(s => s.scheduled_date === new Date().toISOString().split('T')[0]).length,
       });
-    });
+    }).catch(() => setError(true));
   }, []);
+
+  if (error) return <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load dashboard stats. Please try again.</p></div>;
 
   const cards = [
     { label: 'Active Trainers', value: stats?.trainers ?? '…', to: '/trainers', color: '#6366f1' },

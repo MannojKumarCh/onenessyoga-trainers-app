@@ -1,23 +1,21 @@
 import { useState, useEffect } from 'react';
 import client from '../../api/client';
 import { format } from 'date-fns';
+import { groupByDate } from '../../utils/date';
 
 export default function CompletedSessions() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    client.get('/sessions/completed').then(r => setSessions(r.data)).finally(() => setLoading(false));
+    client.get('/sessions/completed').then(r => setSessions(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
   }, []);
 
-  const grouped = sessions.reduce((acc, s) => {
-    const key = s.scheduled_date;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(s);
-    return acc;
-  }, {});
+  const grouped = groupByDate(sessions);
 
   if (loading) return <div className="loading">Loading…</div>;
+  if (error) return <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load completed sessions. Please try again.</p></div>;
 
   return (
     <div className="page">

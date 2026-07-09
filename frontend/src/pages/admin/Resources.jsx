@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import client from '../../api/client';
+import Modal from '../../components/Modal';
 
 export default function AdminResources() {
   const [data, setData] = useState({ items: [], breadcrumb: [] });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [folderId, setFolderId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', type: 'folder', url: '', thumbnail_url: '' });
@@ -12,8 +14,9 @@ export default function AdminResources() {
 
   function load(parentId) {
     setLoading(true);
+    setLoadError(false);
     const q = parentId ? `?parent_id=${parentId}` : '';
-    client.get(`/resources${q}`).then(r => setData(r.data)).finally(() => setLoading(false));
+    client.get(`/resources${q}`).then(r => setData(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }
 
   useEffect(() => { load(folderId); }, [folderId]);
@@ -61,7 +64,9 @@ export default function AdminResources() {
         </div>
       )}
 
-      {loading ? <div className="loading">Loading…</div> : data.items.length === 0 ? (
+      {loading ? <div className="loading">Loading…</div> : loadError ? (
+        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load resources. Please try again.</p></div>
+      ) : data.items.length === 0 ? (
         <div className="empty-state"><div className="empty-state-icon">📁</div><p>Empty folder</p></div>
       ) : data.items.map(item => (
         <div key={item.id} className="list-item" style={{ cursor: item.type === 'folder' ? 'pointer' : 'default' }}
@@ -76,9 +81,7 @@ export default function AdminResources() {
       ))}
 
       {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">Add Item</h3>
+        <Modal title="Add Item" onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
                 <label className="label">Type</label>
@@ -109,8 +112,7 @@ export default function AdminResources() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

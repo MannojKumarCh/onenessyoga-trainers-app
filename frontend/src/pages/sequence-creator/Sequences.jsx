@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import client from '../../api/client';
 import { format, startOfWeek } from 'date-fns';
+import Modal from '../../components/Modal';
 
 export default function CreatorSequences() {
   const [sequences, setSequences] = useState([]);
@@ -8,6 +9,7 @@ export default function CreatorSequences() {
   const [selectedWeek, setSelectedWeek] = useState('');
   const [trainers, setTrainers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ scheduled_date: '', topic: '', assigned_trainer_id: '', instructions: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -21,8 +23,9 @@ export default function CreatorSequences() {
 
   function load() {
     setLoading(true);
+    setLoadError(false);
     const q = selectedWeek ? `?week=${selectedWeek}` : '';
-    client.get(`/sequences${q}`).then(r => setSequences(r.data)).finally(() => setLoading(false));
+    client.get(`/sequences${q}`).then(r => setSequences(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }
 
   useEffect(() => {
@@ -30,10 +33,11 @@ export default function CreatorSequences() {
       setWeeks(w.data);
       setTrainers(t.data);
       if (w.data.length > 0) setSelectedWeek(w.data[0]);
-    });
+      else setLoading(false);
+    }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
-  useEffect(() => { if (selectedWeek !== undefined) load(); }, [selectedWeek]);
+  useEffect(() => { if (!selectedWeek) return; load(); }, [selectedWeek]);
 
   async function submit(e) {
     e.preventDefault();
@@ -105,7 +109,9 @@ export default function CreatorSequences() {
 
       {msg && <p style={{ color: 'var(--success)', fontWeight: 600, marginBottom: 12, textAlign: 'center' }}>{msg}</p>}
 
-      {loading ? <div className="loading">Loading…</div> : sequences.length === 0 ? (
+      {loading ? <div className="loading">Loading…</div> : loadError ? (
+        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load sequences. Please try again.</p></div>
+      ) : sequences.length === 0 ? (
         <div className="empty-state"><div className="empty-state-icon">⊡</div><p>No sequences assigned yet</p></div>
       ) : sequences.map(seq => (
         <div key={seq.id} className="list-item">
@@ -124,9 +130,7 @@ export default function CreatorSequences() {
       ))}
 
       {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">Assign Sequence</h3>
+        <Modal title="Assign Sequence" onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
                 <label className="label">Date</label>
@@ -155,8 +159,7 @@ export default function CreatorSequences() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

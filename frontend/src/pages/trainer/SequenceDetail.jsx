@@ -3,26 +3,34 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import client from '../../api/client';
 import { format } from 'date-fns';
+import Modal from '../../components/Modal';
 
 export default function SequenceDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [seq, setSeq] = useState(null);
+  const [loadError, setLoadError] = useState(false);
   const [link, setLink] = useState('');
   const [uploading, setUploading] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [msg, setMsg] = useState('');
+  const [uploadError, setUploadError] = useState('');
 
   function load() {
     client.get(`/sequences/${id}`).then(r => {
       setSeq(r.data);
       setLink(r.data.google_sheet_link || '');
-    });
+    }).catch(() => setLoadError(true));
   }
 
   useEffect(() => { load(); }, [id]);
+
+  function openUpload() {
+    setUploadError('');
+    setShowUpload(true);
+  }
 
   async function upload(e) {
     e.preventDefault();
@@ -31,10 +39,9 @@ export default function SequenceDetail() {
     try {
       await client.patch(`/sequences/${id}/upload`, { google_sheet_link: link.trim() });
       setShowUpload(false);
-      setMsg('');
       load();
     } catch (err) {
-      setMsg(err.response?.data?.error || 'Upload failed');
+      setUploadError(err.response?.data?.error || 'Upload failed');
     } finally {
       setUploading(false);
     }
@@ -53,8 +60,9 @@ export default function SequenceDetail() {
     }
   }
 
-  const isAssigned = seq?.assigned_trainer_id === user?.id;
+  const isAssigned = String(seq?.assigned_trainer_id) === String(user?.id);
 
+  if (loadError) return <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load this sequence. Please try again.</p></div>;
   if (!seq) return <div className="loading">Loading…</div>;
 
   return (
@@ -87,7 +95,7 @@ export default function SequenceDetail() {
       {msg && <p style={{ textAlign: 'center', color: 'var(--success)', marginBottom: 12, fontWeight: 600 }}>{msg}</p>}
 
       {isAssigned && seq.status === 'pending' && (
-        <button className="btn btn-primary btn-full" onClick={() => setShowUpload(true)}>Upload Google Sheet Link</button>
+        <button className="btn btn-primary btn-full" onClick={openUpload}>Upload Google Sheet Link</button>
       )}
 
       {isAssigned && seq.status === 'uploaded' && !seq.notified_team_at && (
@@ -103,15 +111,13 @@ export default function SequenceDetail() {
       )}
 
       {showUpload && (
-        <div className="modal-overlay" onClick={() => setShowUpload(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">Upload Sequence</h3>
+        <Modal title="Upload Sequence" onClose={() => setShowUpload(false)}>
             <form onSubmit={upload}>
               <div className="form-group">
                 <label className="label">Google Sheet Link</label>
                 <input className="input" type="url" placeholder="https://docs.google.com/…" value={link} onChange={e => setLink(e.target.value)} required />
               </div>
-              {msg && <p className="error-text" style={{ marginBottom: 12 }}>{msg}</p>}
+              {uploadError && <p className="error-text" style={{ marginBottom: 12 }}>{uploadError}</p>}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowUpload(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={uploading}>
@@ -119,8 +125,7 @@ export default function SequenceDetail() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

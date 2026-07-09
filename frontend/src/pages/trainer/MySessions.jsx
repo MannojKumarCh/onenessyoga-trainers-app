@@ -1,32 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
-import { format, isToday, isTomorrow } from 'date-fns';
+import { dayLabel, groupByDate } from '../../utils/date';
 
 export default function MySessions() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    client.get('/sessions/my').then(r => setSessions(r.data)).finally(() => setLoading(false));
+    client.get('/sessions/my').then(r => setSessions(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
   }, []);
 
-  function dayLabel(dateStr) {
-    const d = new Date(dateStr);
-    if (isToday(d)) return 'Today';
-    if (isTomorrow(d)) return 'Tomorrow';
-    return format(d, 'EEEE, d MMMM yyyy');
-  }
-
-  const grouped = sessions.reduce((acc, s) => {
-    const key = s.scheduled_date;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(s);
-    return acc;
-  }, {});
+  const grouped = groupByDate(sessions);
 
   if (loading) return <div className="loading">Loading…</div>;
+  if (error) return <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load sessions. Please try again.</p></div>;
 
   return (
     <div className="page">
@@ -41,7 +31,7 @@ export default function MySessions() {
         </div>
       ) : Object.entries(grouped).map(([date, items]) => (
         <div key={date}>
-          <p className="section-title">{dayLabel(date)}</p>
+          <p className="section-title">{dayLabel(date, 'EEEE, d MMMM yyyy')}</p>
           {items.map(s => (
             <div key={s.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sessions/${s.id}`)}>
               <div className="list-item-left">

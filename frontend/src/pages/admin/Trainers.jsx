@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import client from '../../api/client';
+import Modal from '../../components/Modal';
 
 const EMPTY = { name: '', email: '', password: '', role: 'trainer', zoom_link: '' };
 
 export default function AdminTrainers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
@@ -14,7 +16,7 @@ export default function AdminTrainers() {
   const [resetPw, setResetPw] = useState({ show: false, id: null, password: '' });
 
   function load() {
-    client.get('/users').then(r => setUsers(r.data)).finally(() => setLoading(false));
+    client.get('/users').then(r => setUsers(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }
   useEffect(() => { load(); }, []);
 
@@ -46,17 +48,20 @@ export default function AdminTrainers() {
   }
 
   async function toggleActive(u) {
+    if (u.is_active && !confirm(`Deactivate ${u.name}? They will no longer be able to log in.`)) return;
     await client.put(`/users/${u.id}`, { is_active: u.is_active ? 0 : 1 });
     load();
   }
 
   async function resetPassword(e) {
     e.preventDefault();
+    if (!confirm('Reset this trainer\'s password? They will need the new password to log in.')) return;
     await client.put(`/users/${resetPw.id}/reset-password`, { password: resetPw.password });
     setResetPw({ show: false, id: null, password: '' });
   }
 
   if (loading) return <div className="loading">Loading…</div>;
+  if (loadError) return <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load trainers. Please try again.</p></div>;
 
   return (
     <div className="page">
@@ -85,9 +90,7 @@ export default function AdminTrainers() {
       ))}
 
       {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">{editing ? 'Edit User' : 'Add User'}</h3>
+        <Modal title={editing ? 'Edit User' : 'Add User'} onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
                 <label className="label">Name</label>
@@ -123,14 +126,11 @@ export default function AdminTrainers() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {resetPw.show && (
-        <div className="modal-overlay" onClick={() => setResetPw({ show: false, id: null, password: '' })}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3 className="modal-title">Reset Password</h3>
+        <Modal title="Reset Password" onClose={() => setResetPw({ show: false, id: null, password: '' })}>
             <form onSubmit={resetPassword}>
               <div className="form-group">
                 <label className="label">New Password</label>
@@ -141,8 +141,7 @@ export default function AdminTrainers() {
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Reset</button>
               </div>
             </form>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
