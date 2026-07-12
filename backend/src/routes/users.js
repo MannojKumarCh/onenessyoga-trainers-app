@@ -2,6 +2,12 @@ const router = require('express').Router();
 const bcrypt = require('bcryptjs');
 const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
+const asyncHandler = require('../utils/asyncHandler');
+
+['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
+  const original = router[method].bind(router);
+  router[method] = (path, ...handlers) => original(path, ...handlers.map(handler => asyncHandler(handler)));
+});
 
 // Admin: list all trainers
 router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {

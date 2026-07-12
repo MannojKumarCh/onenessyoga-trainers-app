@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import client from '../../api/client';
 import { format, startOfWeek } from 'date-fns';
 import Modal from '../../components/Modal';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 export default function AdminSequences() {
   const [sequences, setSequences] = useState([]);
@@ -15,7 +16,7 @@ export default function AdminSequences() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [notifying, setNotifying] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [notice, setNotice] = useState({ type: '', text: '' });
 
   function getWeekStart(dateStr) {
     return format(startOfWeek(new Date(dateStr), { weekStartsOn: 1 }), 'yyyy-MM-dd');
@@ -44,14 +45,20 @@ export default function AdminSequences() {
     setError('');
     setSubmitting(true);
     try {
+      const assignedTrainerId = Number(form.assigned_trainer_id);
+      if (!Number.isInteger(assignedTrainerId) || assignedTrainerId <= 0) {
+        setError('Please select a valid trainer.');
+        return;
+      }
+
       const week_start_date = getWeekStart(form.scheduled_date);
-      await client.post('/sequences', { ...form, week_start_date });
+      await client.post('/sequences', { ...form, assigned_trainer_id: assignedTrainerId, week_start_date });
       setShowForm(false);
       setForm({ scheduled_date: '', topic: '', assigned_trainer_id: '', instructions: '' });
       if (!weeks.includes(week_start_date)) setWeeks([week_start_date, ...weeks]);
       setSelectedWeek(week_start_date);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed');
+      setError(getApiErrorMessage(err, 'Failed to save sequence'));
     } finally {
       setSubmitting(false);
     }
@@ -59,12 +66,12 @@ export default function AdminSequences() {
 
   async function notifyWeek() {
     setNotifying(true);
-    setMsg('');
+    setNotice({ type: '', text: '' });
     try {
       await client.post('/sequences/notify-week', { week_start_date: selectedWeek });
-      setMsg('Trainers notified!');
+      setNotice({ type: 'success', text: 'Trainers notified!' });
     } catch (err) {
-      setMsg(err.response?.data?.error || 'Failed');
+      setNotice({ type: 'error', text: getApiErrorMessage(err, 'Failed to notify trainers') });
     } finally {
       setNotifying(false);
     }
@@ -72,8 +79,13 @@ export default function AdminSequences() {
 
   async function deleteSeq(id) {
     if (!confirm('Delete this sequence?')) return;
-    await client.delete(`/sequences/${id}`);
-    load();
+    try {
+      await client.delete(`/sequences/${id}`);
+      setNotice({ type: 'success', text: 'Sequence deleted.' });
+      load();
+    } catch (err) {
+      setNotice({ type: 'error', text: getApiErrorMessage(err, 'Failed to delete sequence') });
+    }
   }
 
   return (
@@ -108,7 +120,18 @@ export default function AdminSequences() {
         </div>
       )}
 
-      {msg && <p style={{ color: 'var(--success)', fontWeight: 600, marginBottom: 12, textAlign: 'center' }}>{msg}</p>}
+      {notice.text && (
+        <p
+          style={{
+            color: notice.type === 'error' ? 'var(--danger)' : 'var(--success)',
+            fontWeight: 600,
+            marginBottom: 12,
+            textAlign: 'center'
+          }}
+        >
+          {notice.text}
+        </p>
+      )}
 
       {loading ? <div className="loading">Loading…</div> : loadError ? (
         <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load sequences. Please try again.</p></div>

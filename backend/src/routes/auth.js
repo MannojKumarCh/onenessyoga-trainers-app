@@ -3,6 +3,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../db/db');
 const { authenticate } = require('../middleware/auth');
+const asyncHandler = require('../utils/asyncHandler');
+
+['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
+  const original = router[method].bind(router);
+  router[method] = (path, ...handlers) => original(path, ...handlers.map(handler => asyncHandler(handler)));
+});
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;

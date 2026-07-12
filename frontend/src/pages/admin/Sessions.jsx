@@ -3,6 +3,7 @@ import client from '../../api/client';
 import { format } from 'date-fns';
 import { groupByDate } from '../../utils/date';
 import Modal from '../../components/Modal';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 const EMPTY_SESSION = { title: 'Daily Session', scheduled_date: '', scheduled_time: '06:15', session_type: 'BKP', assigned_trainer_id: '', zoom_link: '' };
 
@@ -36,13 +37,19 @@ export default function AdminSessions() {
     setError('');
     setSubmitting(true);
     try {
-      const payload = { ...form, assigned_trainer_id: form.assigned_trainer_id || null, zoom_link: form.zoom_link || null };
+      const trainerId = form.assigned_trainer_id ? Number(form.assigned_trainer_id) : null;
+      if (trainerId !== null && (!Number.isInteger(trainerId) || trainerId <= 0)) {
+        setError('Please select a valid trainer.');
+        return;
+      }
+
+      const payload = { ...form, assigned_trainer_id: trainerId, zoom_link: form.zoom_link || null };
       await client.post('/sessions', payload);
       setShowForm(false);
       setForm(EMPTY_SESSION);
       load();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed');
+      setError(getApiErrorMessage(err, 'Failed to save session'));
     } finally {
       setSubmitting(false);
     }

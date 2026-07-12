@@ -1,6 +1,42 @@
 const router = require('express').Router();
 const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
+const asyncHandler = require('../utils/asyncHandler');
+
+['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
+  const original = router[method].bind(router);
+  router[method] = (path, ...handlers) => original(path, ...handlers.map(handler => asyncHandler(handler)));
+});
+
+function httpError(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
+function parseOptionalPositiveInt(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw httpError(400, `${fieldName} must be a positive integer`);
+  }
+  return parsed;
+}
+
+async function ensureTrainerExists(trainerId) {
+  if (trainerId === null) return null;
+
+  const trainer = await prisma.user.findUnique({
+    where: { id: trainerId },
+    select: { id: true, role: true }
+  });
+
+  if (!trainer || trainer.role !== 'trainer') {
+    throw httpError(400, 'assigned_trainer_id must reference an existing trainer');
+  }
+
+  return trainerId;
+}
 
 function serialize(session) {
   const { assigned_trainer, ...rest } = session;
@@ -75,13 +111,15 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
   const { title, scheduled_date, scheduled_time, session_type, assigned_trainer_id, zoom_link } = req.body;
   if (!scheduled_date || !scheduled_time) return res.status(400).json({ error: 'Date and time required' });
 
+  const trainerId = await ensureTrainerExists(parseOptionalPositiveInt(assigned_trainer_id, 'assigned_trainer_id'));
+
   const session = await prisma.session.create({
     data: {
       title: title || 'Daily Session',
       scheduled_date,
       scheduled_time,
       session_type: session_type || 'BKP',
-      assigned_trainer_id: assigned_trainer_id || null,
+      assigned_trainer_id: trainerId,
       zoom_link: zoom_link || null,
       created_by: req.user.id
     }
@@ -95,16 +133,18 @@ router.post('/bulk', authenticate, requireRole('super_admin'), async (req, res) 
   const { sessions } = req.body;
   if (!Array.isArray(sessions) || sessions.length === 0) return res.status(400).json({ error: 'sessions array required' });
 
+  const data = await Promise.all(sessions.map(async s => ({
+    title: s.title || 'Daily Session',
+    scheduled_date: s.scheduled_date,
+    scheduled_time: s.scheduled_time,
+    session_type: s.session_type || 'BKP',
+    assigned_trainer_id: await ensureTrainerExists(parseOptionalPositiveInt(s.assigned_trainer_id, 'assigned_trainer_id')),
+    zoom_link: s.zoom_link || null,
+    created_by: req.user.id
+  })));
+
   await prisma.session.createMany({
-    data: sessions.map(s => ({
-      title: s.title || 'Daily Session',
-      scheduled_date: s.scheduled_date,
-      scheduled_time: s.scheduled_time,
-      session_type: s.session_type || 'BKP',
-      assigned_trainer_id: s.assigned_trainer_id || null,
-      zoom_link: s.zoom_link || null,
-      created_by: req.user.id
-    }))
+    data
   });
 
   res.status(201).json({ success: true, count: sessions.length });
@@ -117,6 +157,8 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
   const session = await prisma.session.findUnique({ where: { id } });
   if (!session) return res.status(404).json({ error: 'Not found' });
 
+  const nextTrainerId = await ensureTrainerExists(parseOptionalPositiveInt(assigned_trainer_id, 'assigned_trainer_id'));
+
   await prisma.session.update({
     where: { id },
     data: {
@@ -124,7 +166,7 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
       scheduled_date: scheduled_date ?? session.scheduled_date,
       scheduled_time: scheduled_time ?? session.scheduled_time,
       session_type: session_type ?? session.session_type,
-      assigned_trainer_id: assigned_trainer_id ?? session.assigned_trainer_id,
+      assigned_trainer_id: nextTrainerId ?? session.assigned_trainer_id,
       zoom_link: zoom_link ?? session.zoom_link
     }
   });

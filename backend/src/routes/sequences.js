@@ -3,6 +3,40 @@ const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { sendToUser, sendToAll } = require('../utils/push');
 
+function asyncHandler(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
+function httpError(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
+function parsePositiveInt(value, fieldName) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw httpError(400, `${fieldName} must be a positive integer`);
+  }
+  return parsed;
+}
+
+function parseOptionalPositiveInt(value, fieldName) {
+  if (value === undefined || value === null || value === '') return undefined;
+  return parsePositiveInt(value, fieldName);
+}
+
+async function ensureTrainerExists(trainerId) {
+  const trainer = await prisma.user.findUnique({
+    where: { id: trainerId },
+    select: { id: true, role: true }
+  });
+
+  if (!trainer || trainer.role !== 'trainer') {
+    throw httpError(400, 'assigned_trainer_id must reference an existing trainer');
+  }
+}
+
 const withNames = {
   assigned_trainer: { select: { name: true } },
   creator: { select: { name: true } }
@@ -18,7 +52,7 @@ function serialize(seq) {
 }
 
 // All roles: view sequences (all can see)
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, asyncHandler(async (req, res) => {
   const { week } = req.query;
   const sequences = await prisma.sequence.findMany({
     where: week ? { week_start_date: week } : {},
@@ -26,10 +60,10 @@ router.get('/', authenticate, async (req, res) => {
     orderBy: { scheduled_date: 'asc' }
   });
   res.json(sequences.map(serialize));
-});
+}));
 
 // Get available weeks
-router.get('/weeks', authenticate, async (req, res) => {
+router.get('/weeks', authenticate, asyncHandler(async (req, res) => {
   const weeks = await prisma.sequence.findMany({
     distinct: ['week_start_date'],
     select: { week_start_date: true },
@@ -37,41 +71,49 @@ router.get('/weeks', authenticate, async (req, res) => {
     take: 20
   });
   res.json(weeks.map(w => w.week_start_date));
-});
+}));
 
 // Get single sequence
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', authenticate, asyncHandler(async (req, res) => {
   const seq = await prisma.sequence.findUnique({
     where: { id: parseInt(req.params.id) },
     include: withNames
   });
   if (!seq) return res.status(404).json({ error: 'Not found' });
   res.json(serialize(seq));
-});
+}));
 
 // Sequence creator / admin: create sequence assignment
-router.post('/', authenticate, requireRole('super_admin', 'sequence_creator'), async (req, res) => {
+router.post('/', authenticate, requireRole('super_admin', 'sequence_creator'), asyncHandler(async (req, res) => {
   const { week_start_date, scheduled_date, topic, assigned_trainer_id, instructions } = req.body;
-  if (!week_start_date || !scheduled_date || !topic || !assigned_trainer_id) {
-    return res.status(400).json({ error: 'week_start_date, scheduled_date, topic, assigned_trainer_id required' });
+  if (!week_start_date || !scheduled_date || !topic) {
+    throw httpError(400, 'week_start_date, scheduled_date, and topic are required');
   }
+
+  const trainerId = parsePositiveInt(assigned_trainer_id, 'assigned_trainer_id');
+  const trimmedTopic = String(topic).trim();
+  if (!trimmedTopic) {
+    throw httpError(400, 'topic is required');
+  }
+
+  await ensureTrainerExists(trainerId);
 
   const seq = await prisma.sequence.create({
     data: {
       week_start_date,
       scheduled_date,
-      topic: topic.trim(),
-      assigned_trainer_id,
-      instructions: instructions || null,
+      topic: trimmedTopic,
+      assigned_trainer_id: trainerId,
+      instructions: instructions ? String(instructions).trim() || null : null,
       created_by: req.user.id
     }
   });
 
   res.status(201).json({ id: seq.id });
-});
+}));
 
 // Sequence creator / admin: notify assigned trainer
-router.post('/:id/notify-trainer', authenticate, requireRole('super_admin', 'sequence_creator'), async (req, res) => {
+router.post('/:id/notify-trainer', authenticate, requireRole('super_admin', 'sequence_creator'), asyncHandler(async (req, res) => {
   const id = parseInt(req.params.id);
   const seq = await prisma.sequence.findUnique({ where: { id } });
   if (!seq) return res.status(404).json({ error: 'Not found' });
@@ -84,10 +126,10 @@ router.post('/:id/notify-trainer', authenticate, requireRole('super_admin', 'seq
 
   await prisma.sequence.update({ where: { id }, data: { notified_trainer_at: new Date() } });
   res.json({ success: true });
-});
+}));
 
 // Sequence creator / admin: notify entire week's trainers at once
-router.post('/notify-week', authenticate, requireRole('super_admin', 'sequence_creator'), async (req, res) => {
+router.post('/notify-week', authenticate, requireRole('super_admin', 'sequence_creator'), asyncHandler(async (req, res) => {
   const { week_start_date } = req.body;
   if (!week_start_date) return res.status(400).json({ error: 'week_start_date required' });
 
@@ -109,10 +151,10 @@ router.post('/notify-week', authenticate, requireRole('super_admin', 'sequence_c
 
   await prisma.sequence.updateMany({ where: { week_start_date }, data: { notified_trainer_at: new Date() } });
   res.json({ success: true });
-});
+}));
 
 // Assigned trainer: upload Google Sheet link
-router.patch('/:id/upload', authenticate, requireRole('trainer'), async (req, res) => {
+router.patch('/:id/upload', authenticate, requireRole('trainer'), asyncHandler(async (req, res) => {
   const { google_sheet_link } = req.body;
   if (!google_sheet_link) return res.status(400).json({ error: 'google_sheet_link required' });
 
@@ -127,10 +169,10 @@ router.patch('/:id/upload', authenticate, requireRole('trainer'), async (req, re
   });
 
   res.json({ success: true });
-});
+}));
 
 // Assigned trainer: notify entire team about their uploaded sequence
-router.post('/:id/notify-team', authenticate, requireRole('trainer'), async (req, res) => {
+router.post('/:id/notify-team', authenticate, requireRole('trainer'), asyncHandler(async (req, res) => {
   const id = parseInt(req.params.id);
   const seq = await prisma.sequence.findUnique({
     where: { id },
@@ -149,32 +191,37 @@ router.post('/:id/notify-team', authenticate, requireRole('trainer'), async (req
 
   await prisma.sequence.update({ where: { id }, data: { notified_team_at: new Date() } });
   res.json({ success: true });
-});
+}));
 
 // Sequence creator / admin: update sequence
-router.put('/:id', authenticate, requireRole('super_admin', 'sequence_creator'), async (req, res) => {
+router.put('/:id', authenticate, requireRole('super_admin', 'sequence_creator'), asyncHandler(async (req, res) => {
   const { topic, scheduled_date, assigned_trainer_id, instructions } = req.body;
   const id = parseInt(req.params.id);
   const seq = await prisma.sequence.findUnique({ where: { id } });
   if (!seq) return res.status(404).json({ error: 'Not found' });
+
+  const nextTrainerId = parseOptionalPositiveInt(assigned_trainer_id, 'assigned_trainer_id');
+  if (nextTrainerId !== undefined) {
+    await ensureTrainerExists(nextTrainerId);
+  }
 
   await prisma.sequence.update({
     where: { id },
     data: {
       topic: topic ?? seq.topic,
       scheduled_date: scheduled_date ?? seq.scheduled_date,
-      assigned_trainer_id: assigned_trainer_id ?? seq.assigned_trainer_id,
+      assigned_trainer_id: nextTrainerId ?? seq.assigned_trainer_id,
       instructions: instructions ?? seq.instructions
     }
   });
 
   res.json({ success: true });
-});
+}));
 
 // Sequence creator / admin: delete
-router.delete('/:id', authenticate, requireRole('super_admin', 'sequence_creator'), async (req, res) => {
+router.delete('/:id', authenticate, requireRole('super_admin', 'sequence_creator'), asyncHandler(async (req, res) => {
   await prisma.sequence.delete({ where: { id: parseInt(req.params.id) } });
   res.json({ success: true });
-});
+}));
 
 module.exports = router;

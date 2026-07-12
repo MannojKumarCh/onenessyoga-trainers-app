@@ -1,6 +1,12 @@
 const router = require('express').Router();
 const prisma = require('../db/db');
 const { authenticate } = require('../middleware/auth');
+const asyncHandler = require('../utils/asyncHandler');
+
+['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
+  const original = router[method].bind(router);
+  router[method] = (path, ...handlers) => original(path, ...handlers.map(handler => asyncHandler(handler)));
+});
 
 // Save push subscription
 router.post('/subscribe', authenticate, async (req, res) => {

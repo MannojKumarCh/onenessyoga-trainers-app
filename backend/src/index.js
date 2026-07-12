@@ -19,8 +19,28 @@ app.use('/api/notifications', require('./routes/notifications'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
-app.listen(PORT, () => console.log(`Oneness Yoga API running on port ${PORT}`));
+app.use((err, req, res, next) => {
+  console.error(err);
+  if (res.headersSent) return next(err);
 
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    error: err.message || 'Internal Server Error'
+  });
+});
+
+app.listen(PORT, () => console.log(`Oneness Yoga API running on port ${PORT}`));
+async function start() {
+  try {
+    await prisma.$connect(); // fail early if DB unreachable
+    // start express server...
+  } catch (err) {
+    console.error('Failed to connect to DB:', err);
+    process.exit(1);
+  }
+}
+
+start();s
 async function shutdown() {
   await prisma.$disconnect();
   process.exit(0);
