@@ -6,14 +6,16 @@ export default function Modal({ title, onClose, children }) {
 
   useEffect(() => {
     dialogRef.current?.querySelector('input, textarea, select, button')?.focus();
+    const trigger = triggerRef.current;
+    return () => trigger?.focus?.();
+  }, []);
+
+  useEffect(() => {
     function onKeyDown(e) {
       if (e.key === 'Escape') onClose();
     }
     document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      triggerRef.current?.focus?.();
-    };
+    return () => document.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 
   return (
