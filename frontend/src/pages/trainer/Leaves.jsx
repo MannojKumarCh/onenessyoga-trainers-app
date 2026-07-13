@@ -76,16 +76,16 @@ export default function Leaves() {
         <Modal title="Apply for Leave" onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
-                <label className="label">From Date <span style={{ color: 'var(--danger)' }}>*</span></label>
-                <input className="input" type="date" value={form.from_date} onChange={e => setForm(f => ({ ...f, from_date: e.target.value }))} required />
+                <label className="label" htmlFor="leave-from-date">From Date <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input id="leave-from-date" className="input" type="date" value={form.from_date} onChange={e => setForm(f => ({ ...f, from_date: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label className="label">To Date <span style={{ color: 'var(--danger)' }}>*</span></label>
-                <input className="input" type="date" value={form.to_date} onChange={e => setForm(f => ({ ...f, to_date: e.target.value }))} required />
+                <label className="label" htmlFor="leave-to-date">To Date <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <input id="leave-to-date" className="input" type="date" value={form.to_date} onChange={e => setForm(f => ({ ...f, to_date: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label className="label">Reason <span style={{ color: 'var(--danger)' }}>*</span></label>
-                <textarea className="input" rows={3} placeholder="Reason for leave…" value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} required />
+                <label className="label" htmlFor="leave-reason">Reason <span style={{ color: 'var(--danger)' }}>*</span></label>
+                <textarea id="leave-reason" className="input" rows={3} placeholder="Reason for leave…" value={form.reason} onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} required />
               </div>
               {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
               <div style={{ display: 'flex', gap: 10 }}>

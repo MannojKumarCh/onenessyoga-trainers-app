@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import client from '../../api/client';
 import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 export default function AdminResources() {
   const [data, setData] = useState({ items: [], breadcrumb: [] });
@@ -11,6 +12,7 @@ export default function AdminResources() {
   const [form, setForm] = useState({ name: '', type: 'folder', url: '', thumbnail_url: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [deleteId, setDeleteId] = useState(null);
 
   function load(parentId) {
     setLoading(true);
@@ -38,7 +40,7 @@ export default function AdminResources() {
   }
 
   async function deleteItem(id) {
-    if (!confirm('Delete this item? Subfolders will also be deleted.')) return;
+    setDeleteId(null);
     await client.delete(`/resources/${id}`);
     load(folderId);
   }
@@ -76,7 +78,7 @@ export default function AdminResources() {
             <div className="list-item-title">{item.name}</div>
             <div className="list-item-sub">{item.type === 'folder' ? 'Folder' : item.url}</div>
           </div>
-          <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id); }} style={{ color: 'var(--danger)', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
+          <button onClick={(e) => { e.stopPropagation(); setDeleteId(item.id); }} style={{ color: 'var(--danger)', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
         </div>
       ))}
 
@@ -84,25 +86,25 @@ export default function AdminResources() {
         <Modal title="Add Item" onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
-                <label className="label">Type</label>
-                <select className="input" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
+                <label className="label" htmlFor="resource-type">Type</label>
+                <select id="resource-type" className="input" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
                   <option value="folder">Folder</option>
                   <option value="link">Link</option>
                 </select>
               </div>
               <div className="form-group">
-                <label className="label">Name</label>
-                <input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+                <label className="label" htmlFor="resource-name">Name</label>
+                <input id="resource-name" className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
               </div>
               {form.type === 'link' && (
                 <div className="form-group">
-                  <label className="label">URL</label>
-                  <input className="input" type="url" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} required placeholder="https://…" />
+                  <label className="label" htmlFor="resource-url">URL</label>
+                  <input id="resource-url" className="input" type="url" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))} required placeholder="https://…" />
                 </div>
               )}
               <div className="form-group">
-                <label className="label">Thumbnail URL (optional)</label>
-                <input className="input" type="url" value={form.thumbnail_url} onChange={e => setForm(f => ({ ...f, thumbnail_url: e.target.value }))} placeholder="https://…" />
+                <label className="label" htmlFor="resource-thumb">Thumbnail URL (optional)</label>
+                <input id="resource-thumb" className="input" type="url" value={form.thumbnail_url} onChange={e => setForm(f => ({ ...f, thumbnail_url: e.target.value }))} placeholder="https://…" />
               </div>
               {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
               <div style={{ display: 'flex', gap: 10 }}>
@@ -113,6 +115,17 @@ export default function AdminResources() {
               </div>
             </form>
         </Modal>
+      )}
+
+      {deleteId != null && (
+        <ConfirmDialog
+          title="Delete Item"
+          message="Delete this item? Subfolders will also be deleted."
+          confirmLabel="Delete"
+          danger
+          onCancel={() => setDeleteId(null)}
+          onConfirm={() => deleteItem(deleteId)}
+        />
       )}
     </div>
   );

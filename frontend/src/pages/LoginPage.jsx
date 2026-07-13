@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import PasswordInput from '../components/PasswordInput';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -36,8 +37,9 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="label">Email</label>
+            <label className="label" htmlFor="login-email">Email</label>
             <input
+              id="login-email"
               className="input"
               type="email"
               placeholder="you@example.com"
@@ -49,10 +51,9 @@ export default function LoginPage() {
           </div>
 
           <div className="form-group">
-            <label className="label">Password</label>
-            <input
-              className="input"
-              type="password"
+            <label className="label" htmlFor="login-password">Password</label>
+            <PasswordInput
+              id="login-password"
               placeholder="••••••••"
               value={password}
               onChange={e => setPassword(e.target.value)}

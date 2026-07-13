@@ -73,8 +73,8 @@ export default function AdminLeaves() {
             <p style={{ color: 'var(--text-secondary)', marginBottom: 4 }}><strong>{reviewing.trainer_name}</strong></p>
             <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 16 }}>{reviewing.from_date} → {reviewing.to_date} · {reviewing.reason}</p>
             <div className="form-group">
-              <label className="label">Note (optional)</label>
-              <textarea className="input" rows={2} value={adminNote} onChange={e => setAdminNote(e.target.value)} placeholder="Reason for decision…" />
+              <label className="label" htmlFor="admin-leave-note">Note (optional)</label>
+              <textarea id="admin-leave-note" className="input" rows={2} value={adminNote} onChange={e => setAdminNote(e.target.value)} placeholder="Reason for decision…" />
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setReviewing(null)}>Cancel</button>

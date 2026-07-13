@@ -39,10 +39,15 @@ export default function AdminDashboard() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
         {cards.map(c => (
-          <div key={c.label} className="card" style={{ cursor: 'pointer', borderTop: `3px solid ${c.color}` }} onClick={() => navigate(c.to)}>
+          <button
+            key={c.label}
+            className="card"
+            style={{ cursor: 'pointer', borderTop: `3px solid ${c.color}`, textAlign: 'left', font: 'inherit', border: '1px solid var(--border)', borderTopWidth: 3, borderTopColor: c.color, background: 'var(--white)' }}
+            onClick={() => navigate(c.to)}
+          >
             <div style={{ fontSize: 28, fontWeight: 700, color: c.color }}>{c.value}</div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>{c.label}</div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -54,14 +59,14 @@ export default function AdminDashboard() {
         { label: 'Manage Sequences', sub: 'Oversee weekly sequence plan', to: '/sequences', icon: '⊡' },
         { label: 'Manage Resources', sub: 'Add books, audios and links', to: '/resources', icon: '📚' },
       ].map(item => (
-        <div key={item.to} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(item.to)}>
+        <button key={item.to} className="list-item" style={{ cursor: 'pointer', width: '100%', textAlign: 'left', font: 'inherit' }} onClick={() => navigate(item.to)}>
           <span style={{ fontSize: 24 }}>{item.icon}</span>
           <div className="list-item-left">
             <div className="list-item-title">{item.label}</div>
             <div className="list-item-sub">{item.sub}</div>
           </div>
           <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1l6 6-6 6" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round"/></svg>
-        </div>
+        </button>
       ))}
     </div>
   );

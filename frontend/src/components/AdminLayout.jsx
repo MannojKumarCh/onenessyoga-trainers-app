@@ -1,4 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '⊞', exact: true },
@@ -10,13 +11,18 @@ const NAV = [
 ];
 
 export default function AdminLayout() {
+  const { logout } = useAuth();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{
         background: 'var(--primary)', color: '#fff', padding: '12px 16px',
-        display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 8, fontSize: 13, fontWeight: 600
       }}>
-        <span>🧘</span> Oneness Yoga — Admin
+        <span><span>🧘</span> Oneness Yoga — Admin</span>
+        <button onClick={logout} style={{ color: '#fff', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+          Logout
+        </button>
       </div>
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <Outlet />

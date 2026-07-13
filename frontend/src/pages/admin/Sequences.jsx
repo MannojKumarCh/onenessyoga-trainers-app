@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import client from '../../api/client';
 import { format, startOfWeek } from 'date-fns';
 import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { getApiErrorMessage } from '../../utils/apiError';
 
 export default function AdminSequences() {
@@ -17,6 +18,7 @@ export default function AdminSequences() {
   const [error, setError] = useState('');
   const [notifying, setNotifying] = useState(false);
   const [notice, setNotice] = useState({ type: '', text: '' });
+  const [deleteId, setDeleteId] = useState(null);
 
   function getWeekStart(dateStr) {
     return format(startOfWeek(new Date(dateStr), { weekStartsOn: 1 }), 'yyyy-MM-dd');
@@ -78,7 +80,7 @@ export default function AdminSequences() {
   }
 
   async function deleteSeq(id) {
-    if (!confirm('Delete this sequence?')) return;
+    setDeleteId(null);
     try {
       await client.delete(`/sequences/${id}`);
       setNotice({ type: 'success', text: 'Sequence deleted.' });
@@ -144,7 +146,7 @@ export default function AdminSequences() {
             <div className="list-item-title">{seq.topic}</div>
             <div className="list-item-sub">{format(new Date(seq.scheduled_date), 'EEE, d MMM')} · {seq.trainer_name}</div>
           </div>
-          <button onClick={() => deleteSeq(seq.id)} style={{ color: 'var(--danger)', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
+          <button onClick={() => setDeleteId(seq.id)} style={{ color: 'var(--danger)', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
         </div>
       ))}
 
@@ -152,23 +154,23 @@ export default function AdminSequences() {
         <Modal title="Add Sequence" onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
-                <label className="label">Date</label>
-                <input className="input" type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} required />
+                <label className="label" htmlFor="admin-seq-date">Date</label>
+                <input id="admin-seq-date" className="input" type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label className="label">Topic</label>
-                <input className="input" value={form.topic} placeholder="e.g. Surya Namaskar + Yoga" onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} required />
+                <label className="label" htmlFor="admin-seq-topic">Topic</label>
+                <input id="admin-seq-topic" className="input" value={form.topic} placeholder="e.g. Surya Namaskar + Yoga" onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label className="label">Assign Trainer</label>
-                <select className="input" value={form.assigned_trainer_id} onChange={e => setForm(f => ({ ...f, assigned_trainer_id: e.target.value }))} required>
+                <label className="label" htmlFor="admin-seq-trainer">Assign Trainer</label>
+                <select id="admin-seq-trainer" className="input" value={form.assigned_trainer_id} onChange={e => setForm(f => ({ ...f, assigned_trainer_id: e.target.value }))} required>
                   <option value="">Select trainer…</option>
                   {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label className="label">Instructions (optional)</label>
-                <textarea className="input" rows={3} value={form.instructions} onChange={e => setForm(f => ({ ...f, instructions: e.target.value }))} />
+                <label className="label" htmlFor="admin-seq-instructions">Instructions (optional)</label>
+                <textarea id="admin-seq-instructions" className="input" rows={3} value={form.instructions} onChange={e => setForm(f => ({ ...f, instructions: e.target.value }))} />
               </div>
               {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
               <div style={{ display: 'flex', gap: 10 }}>
@@ -179,6 +181,17 @@ export default function AdminSequences() {
               </div>
             </form>
         </Modal>
+      )}
+
+      {deleteId != null && (
+        <ConfirmDialog
+          title="Delete Sequence"
+          message="Delete this sequence?"
+          confirmLabel="Delete"
+          danger
+          onCancel={() => setDeleteId(null)}
+          onConfirm={() => deleteSeq(deleteId)}
+        />
       )}
     </div>
   );

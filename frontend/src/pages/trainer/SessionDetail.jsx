@@ -65,8 +65,9 @@ export default function SessionDetail() {
       </div>
 
       <div className="form-group">
-        <label className="label">Session Notes</label>
+        <label className="label" htmlFor="session-notes">Session Notes</label>
         <textarea
+          id="session-notes"
           className="input"
           rows={4}
           placeholder="Write a note…"

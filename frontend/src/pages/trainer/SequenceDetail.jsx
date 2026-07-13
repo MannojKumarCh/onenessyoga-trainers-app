@@ -114,8 +114,8 @@ export default function SequenceDetail() {
         <Modal title="Upload Sequence" onClose={() => setShowUpload(false)}>
             <form onSubmit={upload}>
               <div className="form-group">
-                <label className="label">Google Sheet Link</label>
-                <input className="input" type="url" placeholder="https://docs.google.com/…" value={link} onChange={e => setLink(e.target.value)} required />
+                <label className="label" htmlFor="sheet-link">Google Sheet Link</label>
+                <input id="sheet-link" className="input" type="url" placeholder="https://docs.google.com/…" value={link} onChange={e => setLink(e.target.value)} required />
               </div>
               {uploadError && <p className="error-text" style={{ marginBottom: 12 }}>{uploadError}</p>}
               <div style={{ display: 'flex', gap: 10 }}>

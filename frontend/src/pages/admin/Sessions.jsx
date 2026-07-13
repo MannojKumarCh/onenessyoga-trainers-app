@@ -3,6 +3,7 @@ import client from '../../api/client';
 import { format } from 'date-fns';
 import { groupByDate } from '../../utils/date';
 import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { getApiErrorMessage } from '../../utils/apiError';
 
 const EMPTY_SESSION = { title: 'Daily Session', scheduled_date: '', scheduled_time: '06:15', session_type: 'BKP', assigned_trainer_id: '', zoom_link: '' };
@@ -17,6 +18,7 @@ export default function AdminSessions() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
+  const [deleteId, setDeleteId] = useState(null);
 
   function load() {
     setLoading(true);
@@ -56,7 +58,7 @@ export default function AdminSessions() {
   }
 
   async function deleteSession(id) {
-    if (!confirm('Delete this session?')) return;
+    setDeleteId(null);
     await client.delete(`/sessions/${id}`);
     load();
   }
@@ -71,8 +73,8 @@ export default function AdminSessions() {
       </div>
 
       <div className="form-group">
-        <label className="label">From date</label>
-        <input className="input" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+        <label className="label" htmlFor="sessions-from-date">From date</label>
+        <input id="sessions-from-date" className="input" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
       </div>
 
       {loading ? <div className="loading">Loading…</div> : loadError ? (
@@ -90,7 +92,7 @@ export default function AdminSessions() {
                 </div>
                 <div className="list-item-sub">{s.scheduled_time} · {s.trainer_name || 'Unassigned'}</div>
               </div>
-              <button onClick={() => deleteSession(s.id)} style={{ color: 'var(--danger)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
+              <button onClick={() => setDeleteId(s.id)} style={{ color: 'var(--danger)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
             </div>
           ))}
         </div>
@@ -100,33 +102,33 @@ export default function AdminSessions() {
         <Modal title="Add Session" onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
-                <label className="label">Title</label>
-                <input className="input" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
+                <label className="label" htmlFor="session-title">Title</label>
+                <input id="session-title" className="input" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div className="form-group">
-                  <label className="label">Date</label>
-                  <input className="input" type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} required />
+                  <label className="label" htmlFor="session-date">Date</label>
+                  <input id="session-date" className="input" type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} required />
                 </div>
                 <div className="form-group">
-                  <label className="label">Time</label>
-                  <input className="input" type="time" value={form.scheduled_time} onChange={e => setForm(f => ({ ...f, scheduled_time: e.target.value }))} required />
+                  <label className="label" htmlFor="session-time">Time</label>
+                  <input id="session-time" className="input" type="time" value={form.scheduled_time} onChange={e => setForm(f => ({ ...f, scheduled_time: e.target.value }))} required />
                 </div>
               </div>
               <div className="form-group">
-                <label className="label">Session Type</label>
-                <input className="input" value={form.session_type} onChange={e => setForm(f => ({ ...f, session_type: e.target.value }))} placeholder="BKP" />
+                <label className="label" htmlFor="session-type">Session Type</label>
+                <input id="session-type" className="input" value={form.session_type} onChange={e => setForm(f => ({ ...f, session_type: e.target.value }))} placeholder="BKP" />
               </div>
               <div className="form-group">
-                <label className="label">Assign Trainer</label>
-                <select className="input" value={form.assigned_trainer_id} onChange={e => setForm(f => ({ ...f, assigned_trainer_id: e.target.value }))}>
+                <label className="label" htmlFor="session-trainer">Assign Trainer</label>
+                <select id="session-trainer" className="input" value={form.assigned_trainer_id} onChange={e => setForm(f => ({ ...f, assigned_trainer_id: e.target.value }))}>
                   <option value="">Unassigned</option>
                   {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label className="label">Zoom Link</label>
-                <input className="input" type="url" value={form.zoom_link} onChange={e => setForm(f => ({ ...f, zoom_link: e.target.value }))} placeholder="https://…" />
+                <label className="label" htmlFor="session-zoom">Zoom Link</label>
+                <input id="session-zoom" className="input" type="url" value={form.zoom_link} onChange={e => setForm(f => ({ ...f, zoom_link: e.target.value }))} placeholder="https://…" />
               </div>
               {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
               <div style={{ display: 'flex', gap: 10 }}>
@@ -137,6 +139,17 @@ export default function AdminSessions() {
               </div>
             </form>
         </Modal>
+      )}
+
+      {deleteId != null && (
+        <ConfirmDialog
+          title="Delete Session"
+          message="Delete this session?"
+          confirmLabel="Delete"
+          danger
+          onCancel={() => setDeleteId(null)}
+          onConfirm={() => deleteSession(deleteId)}
+        />
       )}
     </div>
   );

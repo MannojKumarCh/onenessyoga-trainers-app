@@ -155,23 +155,23 @@ export default function CreatorSequences() {
         <Modal title="Assign Sequence" onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
-                <label className="label">Date</label>
-                <input className="input" type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} required />
+                <label className="label" htmlFor="creator-seq-date">Date</label>
+                <input id="creator-seq-date" className="input" type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label className="label">Topic</label>
-                <input className="input" value={form.topic} placeholder="e.g. Surya Namaskar + Yoga" onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} required />
+                <label className="label" htmlFor="creator-seq-topic">Topic</label>
+                <input id="creator-seq-topic" className="input" value={form.topic} placeholder="e.g. Surya Namaskar + Yoga" onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label className="label">Assign To</label>
-                <select className="input" value={form.assigned_trainer_id} onChange={e => setForm(f => ({ ...f, assigned_trainer_id: e.target.value }))} required>
+                <label className="label" htmlFor="creator-seq-trainer">Assign To</label>
+                <select id="creator-seq-trainer" className="input" value={form.assigned_trainer_id} onChange={e => setForm(f => ({ ...f, assigned_trainer_id: e.target.value }))} required>
                   <option value="">Select trainer…</option>
                   {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label className="label">Instructions (optional)</label>
-                <textarea className="input" rows={3} value={form.instructions} onChange={e => setForm(f => ({ ...f, instructions: e.target.value }))} placeholder="Any notes for the trainer…" />
+                <label className="label" htmlFor="creator-seq-instructions">Instructions (optional)</label>
+                <textarea id="creator-seq-instructions" className="input" rows={3} value={form.instructions} onChange={e => setForm(f => ({ ...f, instructions: e.target.value }))} placeholder="Any notes for the trainer…" />
               </div>
               {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
               <div style={{ display: 'flex', gap: 10 }}>

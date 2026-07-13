@@ -82,10 +82,10 @@ a:focus-visible, button:focus-visible, .list-item:focus-visible {
 .list-item {
   background: var(--white); border-radius: var(--radius); padding: 14px 16px;
   border: 1px solid var(--border); margin-bottom: 8px; display: flex;
-  align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
 }
 .list-item:active { background: var(--bg); }
-.list-item-left { flex: 1; min-width: 0; }
+.list-item-left { flex: 1 1 180px; min-width: 0; }
 .list-item-title { font-size: 16px; font-weight: 600; }
 .list-item-sub { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
 

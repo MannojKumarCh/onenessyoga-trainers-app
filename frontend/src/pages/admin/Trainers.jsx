@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import client from '../../api/client';
 import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
+import PasswordInput from '../../components/PasswordInput';
+import { useAuth } from '../../context/AuthContext';
 
 const EMPTY = { name: '', email: '', password: '', role: 'trainer', zoom_link: '' };
 
 export default function AdminTrainers() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -14,6 +18,7 @@ export default function AdminTrainers() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [resetPw, setResetPw] = useState({ show: false, id: null, password: '' });
+  const [deactivating, setDeactivating] = useState(null);
 
   function load() {
     client.get('/users').then(r => setUsers(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
@@ -48,14 +53,21 @@ export default function AdminTrainers() {
   }
 
   async function toggleActive(u) {
-    if (u.is_active && !confirm(`Deactivate ${u.name}? They will no longer be able to log in.`)) return;
-    await client.put(`/users/${u.id}`, { is_active: u.is_active ? 0 : 1 });
+    if (u.id === currentUser?.id) return;
+    if (u.is_active) { setDeactivating(u); return; }
+    await client.put(`/users/${u.id}`, { is_active: 1 });
+    load();
+  }
+
+  async function confirmDeactivate() {
+    const u = deactivating;
+    setDeactivating(null);
+    await client.put(`/users/${u.id}`, { is_active: 0 });
     load();
   }
 
   async function resetPassword(e) {
     e.preventDefault();
-    if (!confirm('Reset this trainer\'s password? They will need the new password to log in.')) return;
     await client.put(`/users/${resetPw.id}/reset-password`, { password: resetPw.password });
     setResetPw({ show: false, id: null, password: '' });
   }
@@ -82,9 +94,11 @@ export default function AdminTrainers() {
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 10px' }} onClick={() => openEdit(u)}>Edit</button>
             <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 10px' }} onClick={() => setResetPw({ show: true, id: u.id, password: '' })}>Reset PW</button>
-            <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 10px', color: u.is_active ? 'var(--danger)' : 'var(--success)' }} onClick={() => toggleActive(u)}>
-              {u.is_active ? 'Deactivate' : 'Activate'}
-            </button>
+            {u.id !== currentUser?.id && (
+              <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 10px', color: u.is_active ? 'var(--danger)' : 'var(--success)' }} onClick={() => toggleActive(u)}>
+                {u.is_active ? 'Deactivate' : 'Activate'}
+              </button>
+            )}
           </div>
         </div>
       ))}
@@ -93,30 +107,30 @@ export default function AdminTrainers() {
         <Modal title={editing ? 'Edit User' : 'Add User'} onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
-                <label className="label">Name</label>
-                <input className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
+                <label className="label" htmlFor="trainer-name">Name</label>
+                <input id="trainer-name" className="input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
               </div>
               <div className="form-group">
-                <label className="label">Email</label>
-                <input className="input" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
+                <label className="label" htmlFor="trainer-email">Email</label>
+                <input id="trainer-email" className="input" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
               </div>
               {!editing && (
                 <div className="form-group">
-                  <label className="label">Password</label>
-                  <input className="input" type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required minLength={8} />
+                  <label className="label" htmlFor="trainer-password">Password</label>
+                  <PasswordInput id="trainer-password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required minLength={8} />
                 </div>
               )}
               <div className="form-group">
-                <label className="label">Role</label>
-                <select className="input" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+                <label className="label" htmlFor="trainer-role">Role</label>
+                <select id="trainer-role" className="input" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
                   <option value="trainer">Trainer</option>
                   <option value="sequence_creator">Sequence Creator</option>
                   <option value="super_admin">Super Admin</option>
                 </select>
               </div>
               <div className="form-group">
-                <label className="label">Zoom Link</label>
-                <input className="input" type="url" value={form.zoom_link} placeholder="https://us06web.zoom.us/j/…" onChange={e => setForm(f => ({ ...f, zoom_link: e.target.value }))} />
+                <label className="label" htmlFor="trainer-zoom">Zoom Link</label>
+                <input id="trainer-zoom" className="input" type="url" value={form.zoom_link} placeholder="https://us06web.zoom.us/j/…" onChange={e => setForm(f => ({ ...f, zoom_link: e.target.value }))} />
               </div>
               {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
               <div style={{ display: 'flex', gap: 10 }}>
@@ -133,8 +147,8 @@ export default function AdminTrainers() {
         <Modal title="Reset Password" onClose={() => setResetPw({ show: false, id: null, password: '' })}>
             <form onSubmit={resetPassword}>
               <div className="form-group">
-                <label className="label">New Password</label>
-                <input className="input" type="password" value={resetPw.password} onChange={e => setResetPw(p => ({ ...p, password: e.target.value }))} required minLength={8} />
+                <label className="label" htmlFor="reset-password">New Password</label>
+                <PasswordInput id="reset-password" value={resetPw.password} onChange={e => setResetPw(p => ({ ...p, password: e.target.value }))} required minLength={8} />
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setResetPw({ show: false, id: null, password: '' })}>Cancel</button>
@@ -142,6 +156,17 @@ export default function AdminTrainers() {
               </div>
             </form>
         </Modal>
+      )}
+
+      {deactivating && (
+        <ConfirmDialog
+          title="Deactivate Trainer"
+          message={`Deactivate ${deactivating.name}? They will no longer be able to log in.`}
+          confirmLabel="Deactivate"
+          danger
+          onCancel={() => setDeactivating(null)}
+          onConfirm={confirmDeactivate}
+        />
       )}
     </div>
   );

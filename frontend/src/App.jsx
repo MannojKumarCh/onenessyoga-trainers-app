@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { usePush } from './hooks/usePush';
 import LoginPage from './pages/LoginPage';
@@ -21,9 +22,19 @@ import AdminResources from './pages/admin/Resources';
 import SequenceCreatorLayout from './components/SequenceCreatorLayout';
 import CreatorSequences from './pages/sequence-creator/Sequences';
 
+function usePageTitle() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    const segment = pathname.split('/').filter(Boolean).pop();
+    const label = segment ? segment[0].toUpperCase() + segment.slice(1) : 'Dashboard';
+    document.title = `Oneness Yoga — ${label}`;
+  }, [pathname]);
+}
+
 function AppRoutes() {
   const { user } = useAuth();
   usePush(user);
+  usePageTitle();
 
   if (!user) return <Routes><Route path="*" element={<LoginPage />} /></Routes>;
 
@@ -75,7 +86,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>
