@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'logo192.png'],
       manifest: {
@@ -24,15 +27,8 @@ export default defineConfig({
           { src: 'logo512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ]
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^\/api\/.*/i,
-            handler: 'NetworkFirst',
-            options: { cacheName: 'api-cache', networkTimeoutSeconds: 10 }
-          }
-        ]
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}']
       }
     })
   ],

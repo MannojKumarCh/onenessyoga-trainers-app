@@ -40,7 +40,7 @@ async function start() {
   }
 }
 
-start();s
+start();
 async function shutdown() {
   await prisma.$disconnect();
   process.exit(0);

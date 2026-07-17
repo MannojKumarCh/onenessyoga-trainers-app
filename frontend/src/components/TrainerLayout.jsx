@@ -1,4 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom';
+import PushNotificationsPrompt from './PushNotificationsPrompt';
 
 const NAV = [
   { to: '/', label: 'Home', icon: '⊞', exact: true },
@@ -12,6 +13,7 @@ const NAV = [
 export default function TrainerLayout() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <PushNotificationsPrompt />
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <Outlet />
       </div>

@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { usePush } from './hooks/usePush';
 import LoginPage from './pages/LoginPage';
 import TrainerLayout from './components/TrainerLayout';
 import AdminLayout from './components/AdminLayout';
@@ -33,7 +32,6 @@ function usePageTitle() {
 
 function AppRoutes() {
   const { user } = useAuth();
-  usePush(user);
   usePageTitle();
 
   if (!user) return <Routes><Route path="*" element={<LoginPage />} /></Routes>;

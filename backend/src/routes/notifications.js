@@ -32,6 +32,10 @@ router.post('/unsubscribe', authenticate, async (req, res) => {
 
 // Get VAPID public key (needed by frontend to subscribe)
 router.get('/vapid-public-key', (req, res) => {
+  if (!process.env.VAPID_PUBLIC_KEY) {
+    return res.status(503).json({ error: 'Push notifications are not configured on this server' });
+  }
+
   res.json({ key: process.env.VAPID_PUBLIC_KEY });
 });
 

@@ -1,8 +1,9 @@
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PushNotificationsPrompt from './PushNotificationsPrompt';
 
 export default function SequenceCreatorLayout() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{
@@ -14,6 +15,7 @@ export default function SequenceCreatorLayout() {
           Logout
         </button>
       </div>
+      <PushNotificationsPrompt />
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <Outlet />
       </div>

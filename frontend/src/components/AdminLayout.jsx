@@ -1,5 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PushNotificationsPrompt from './PushNotificationsPrompt';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '⊞', exact: true },
@@ -24,6 +25,7 @@ export default function AdminLayout() {
           Logout
         </button>
       </div>
+      <PushNotificationsPrompt />
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <Outlet />
       </div>
