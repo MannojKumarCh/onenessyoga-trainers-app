@@ -1,9 +1,12 @@
 # Product Requirements Document
 ## Oneness Yoga Trainers App
 
-**Version:** 1.0
-**Date:** 7 June 2026
+**Version:** 1.1
+**Date:** 7 June 2026 (last updated 12 July 2026)
 **Status:** Draft
+
+**Changelog:**
+- **v1.1 (12 July 2026):** Database migrated from SQLite (`node:sqlite`) to PostgreSQL + Prisma ORM. Added Section 6.1a (Data Model) documenting the Prisma schema. See Section 6.1 and 6.5 for updated stack/ops entries.
 
 ---
 
@@ -225,13 +228,32 @@ The Oneness Yoga Trainers App is an internal Progressive Web App (PWA) designed 
 | Frontend | React 18 + Vite |
 | PWA | vite-plugin-pwa (Workbox) |
 | Backend | Node.js 22 + Express |
-| Database | SQLite via `node:sqlite` (built-in, no native compilation) |
+| Database | PostgreSQL (native install on the Oracle VM) via Prisma ORM 6.19.3 |
 | Auth | JWT + Google OAuth 2.0 |
 | Push | Web Push API (VAPID, `web-push` npm package) |
 | Hosting | Oracle Cloud Always Free (4 OCPU, 24GB RAM, Ubuntu) |
 | Reverse Proxy | Nginx |
 | TLS | Let's Encrypt via Certbot (auto-renewal) |
 | Process Manager | PM2 |
+
+*(Originally SQLite via `node:sqlite` — migrated to PostgreSQL + Prisma on 7 July 2026 for a production-grade DB. Prisma's query engine is a prebuilt binary, so no C++ build tools are needed on Windows dev machines.)*
+
+### 6.1a Data Model
+
+Schema defined in `backend/prisma/schema.prisma`. Field names stay snake_case (e.g. `zoom_link`, `is_active`) matching the original SQLite columns, so route handlers and the frontend needed no changes.
+
+| Table | Purpose | Key relations |
+|---|---|---|
+| `users` | All accounts across the 3 roles (`super_admin`, `sequence_creator`, `trainer`) | — |
+| `sessions` | Scheduled daily classes | `assigned_trainer_id` → users, `created_by` → users |
+| `leaves` | Leave requests and approval status | `trainer_id` → users, `reviewed_by` → users |
+| `sequences` | Weekly topic assignments and uploaded sheet links | `assigned_trainer_id` → users, `created_by` → users |
+| `resources` | Nestable folder/link library | self-referencing `parent_id` |
+| `push_subscriptions` | Per-device VAPID push endpoints | `user_id` → users |
+
+Enums: `Role` (`super_admin`/`sequence_creator`/`trainer`), `LeaveStatus` (`pending`/`approved`/`rejected`), `SequenceStatus` (`pending`/`uploaded`), `ResourceType` (`folder`/`link`) — values match the original CHECK-constraint strings exactly.
+
+Full ER diagram: [`DB Schema Diagram - Oneness Yoga Trainers App.md`](./DB%20Schema%20Diagram%20-%20Oneness%20Yoga%20Trainers%20App.md)
 
 ### 6.2 PWA Requirements
 - Installable on Android and iOS (Add to Home Screen)
@@ -259,7 +281,7 @@ The Oneness Yoga Trainers App is an internal Progressive Web App (PWA) designed 
 
 ### 6.5 Oracle VM — Operational
 - Backend runs via PM2 (auto-restart on crash, starts on reboot)
-- SQLite DB backed up daily to Oracle Object Storage (free 20GB)
+- PostgreSQL DB backed up daily to Oracle Object Storage (free 20GB)
 - Keep-alive cron job runs every 30 min to prevent idle CPU reclamation
 - Admin logs in to Oracle Cloud Console at least once a month to prevent account suspension
 

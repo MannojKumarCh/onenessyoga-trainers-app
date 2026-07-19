@@ -29,11 +29,10 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => console.log(`Oneness Yoga API running on port ${PORT}`));
 async function start() {
   try {
     await prisma.$connect(); // fail early if DB unreachable
-    // start express server...
+    app.listen(PORT, () => console.log(`Oneness Yoga API running on port ${PORT}`));
   } catch (err) {
     console.error('Failed to connect to DB:', err);
     process.exit(1);
