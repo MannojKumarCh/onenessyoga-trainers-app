@@ -46,7 +46,10 @@ export function usePush(user) {
       reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
     }
 
-    const currentReg = reg || await navigator.serviceWorker.ready;
+    // Always wait for the registration to actually be active before subscribing —
+    // a freshly-registered/installing worker isn't ready yet and pushManager.subscribe()
+    // throws AbortError against it.
+    const currentReg = await navigator.serviceWorker.ready;
     if (!currentReg) {
       throw new Error('Could not register a service worker for push notifications.');
     }

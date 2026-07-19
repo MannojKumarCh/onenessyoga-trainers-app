@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import PushNotificationsPrompt from './PushNotificationsPrompt';
+import NotificationBell from './NotificationBell';
 
 export default function SequenceCreatorLayout() {
   const { logout } = useAuth();
@@ -11,9 +12,12 @@ export default function SequenceCreatorLayout() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between'
       }}>
         <span style={{ fontWeight: 700 }}>🧘 Oneness Yoga</span>
-        <button onClick={logout} style={{ color: '#fff', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer' }}>
-          Logout
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <NotificationBell />
+          <button onClick={logout} style={{ color: '#fff', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer' }}>
+            Logout
+          </button>
+        </div>
       </div>
       <PushNotificationsPrompt />
       <div style={{ flex: 1, overflow: 'hidden' }}>

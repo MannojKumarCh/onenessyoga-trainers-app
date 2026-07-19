@@ -20,6 +20,7 @@ import AdminSequences from './pages/admin/Sequences';
 import AdminResources from './pages/admin/Resources';
 import SequenceCreatorLayout from './components/SequenceCreatorLayout';
 import CreatorSequences from './pages/sequence-creator/Sequences';
+import Notifications from './pages/Notifications';
 
 function usePageTitle() {
   const { pathname } = useLocation();
@@ -46,6 +47,7 @@ function AppRoutes() {
           <Route path="leaves" element={<AdminLeaves />} />
           <Route path="sequences" element={<AdminSequences />} />
           <Route path="resources" element={<AdminResources />} />
+          <Route path="notifications" element={<Notifications />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -58,6 +60,7 @@ function AppRoutes() {
         <Route path="/" element={<SequenceCreatorLayout />}>
           <Route index element={<CreatorSequences />} />
           <Route path="sequences" element={<CreatorSequences />} />
+          <Route path="notifications" element={<Notifications />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -75,6 +78,7 @@ function AppRoutes() {
         <Route path="sequences" element={<Sequences />} />
         <Route path="sequences/:id" element={<SequenceDetail />} />
         <Route path="resources" element={<Resources />} />
+        <Route path="notifications" element={<Notifications />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

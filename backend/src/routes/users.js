@@ -3,6 +3,8 @@ const bcrypt = require('bcryptjs');
 const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
+const { sendWelcomeEmail, sendGoogleLinkDecisionEmail } = require('../utils/mail');
+const { notifyUser } = require('../utils/notify');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
   const original = router[method].bind(router);
@@ -12,7 +14,7 @@ const asyncHandler = require('../utils/asyncHandler');
 // Admin: list all trainers
 router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, role: true, zoom_link: true, is_active: true, created_at: true },
+    select: { id: true, name: true, email: true, role: true, zoom_link: true, is_active: true, google_link_status: true, created_at: true },
     orderBy: { name: 'asc' }
   });
   res.json(users);
@@ -29,10 +31,12 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
   const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existing) return res.status(409).json({ error: 'Email already exists' });
 
-  const hash = bcrypt.hashSync(password, 10);
+  const hash = await bcrypt.hash(password, 10);
   const user = await prisma.user.create({
     data: { name: name.trim(), email: normalizedEmail, password_hash: hash, role, zoom_link: zoom_link || null }
   });
+
+  await sendWelcomeEmail(user).catch(err => console.error('Failed to send welcome email:', err));
 
   res.status(201).json({ id: user.id });
 });
@@ -63,8 +67,42 @@ router.put('/:id/reset-password', authenticate, requireRole('super_admin'), asyn
   const { password } = req.body;
   if (!password || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
-  const hash = bcrypt.hashSync(password, 10);
+  const hash = await bcrypt.hash(password, 10);
   await prisma.user.update({ where: { id: parseInt(req.params.id) }, data: { password_hash: hash } });
+  res.json({ success: true });
+});
+
+// Admin: approve or reject a pending Google sign-in link
+router.put('/:id/google-link', authenticate, requireRole('super_admin'), async (req, res) => {
+  const { status } = req.body;
+  if (!['approved', 'rejected'].includes(status)) {
+    return res.status(400).json({ error: 'status must be approved or rejected' });
+  }
+
+  const id = parseInt(req.params.id);
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  if (user.google_link_status !== 'pending') {
+    return res.status(400).json({ error: 'Only pending requests can be approved or rejected' });
+  }
+
+  await prisma.user.update({
+    where: { id },
+    data: status === 'approved'
+      ? { google_link_status: 'approved', google_linked_at: new Date() }
+      : { google_link_status: 'rejected', google_id: null }
+  });
+
+  await notifyUser(user.id, {
+    title: status === 'approved' ? 'Google Sign-In Approved' : 'Google Sign-In Request Rejected',
+    body: status === 'approved'
+      ? 'You can now sign in with Google.'
+      : 'Your Google sign-in request was not approved. Contact an admin or use your password to log in.',
+    url: '/'
+  }).catch(err => console.error('Failed to send Google-link decision notification:', err));
+
+  await sendGoogleLinkDecisionEmail(user, status).catch(err => console.error('Failed to send Google-link decision email:', err));
+
   res.json({ success: true });
 });
 

@@ -1,12 +1,19 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const prisma = require('./db/db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors({ origin: process.env.FRONTEND_URL || true }));
+const FRONTEND_URL = process.env.FRONTEND_URL;
+if (!FRONTEND_URL && process.env.NODE_ENV === 'production') {
+  throw new Error('FRONTEND_URL must be set in production');
+}
+
+app.use(helmet());
+app.use(cors({ origin: FRONTEND_URL || 'http://localhost:5173' }));
 app.use(express.json());
 
 app.use('/api/auth', require('./routes/auth'));
@@ -29,10 +36,12 @@ app.use((err, req, res, next) => {
   });
 });
 
+let server;
+
 async function start() {
   try {
     await prisma.$connect(); // fail early if DB unreachable
-    app.listen(PORT, () => console.log(`Oneness Yoga API running on port ${PORT}`));
+    server = app.listen(PORT, () => console.log(`Oneness Yoga API running on port ${PORT}`));
   } catch (err) {
     console.error('Failed to connect to DB:', err);
     process.exit(1);
@@ -40,10 +49,25 @@ async function start() {
 }
 
 start();
+
 async function shutdown() {
+  const forceExit = setTimeout(() => process.exit(1), 10000).unref();
+  if (server) {
+    await new Promise(resolve => server.close(resolve));
+  }
   await prisma.$disconnect();
+  clearTimeout(forceExit);
   process.exit(0);
 }
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
+});

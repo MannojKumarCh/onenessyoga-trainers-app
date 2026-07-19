@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { dayLabel } from '../../utils/date';
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const [pendingLeaves, setPendingLeaves] = useState([]);
@@ -33,12 +33,9 @@ export default function Dashboard() {
 
   return (
     <div className="page">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700 }}>Hello, {user.name.split(' ')[0]} 👋</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 2 }}>{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
-        </div>
-        <button onClick={logout} className="btn btn-ghost" style={{ fontSize: 13 }}>Logout</button>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700 }}>Hello, {user.name.split(' ')[0]} 👋</h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginTop: 2 }}>{format(new Date(), 'EEEE, d MMMM yyyy')}</p>
       </div>
 
       {/* Upcoming sessions */}
@@ -51,13 +48,13 @@ export default function Dashboard() {
           No upcoming sessions
         </div>
       ) : sessions.map(s => (
-        <div key={s.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sessions/${s.id}`)}>
+        <button key={s.id} className="list-item" style={{ cursor: 'pointer', width: '100%', textAlign: 'left', font: 'inherit' }} onClick={() => navigate(`/sessions/${s.id}`)}>
           <div className="list-item-left">
             <div className="list-item-title">{s.title}</div>
             <div className="list-item-sub">{dayLabel(s.scheduled_date)} · {s.scheduled_time}</div>
           </div>
           <span className="tag">{s.session_type}</span>
-        </div>
+        </button>
       ))}
 
       {/* Pending leaves */}
@@ -87,13 +84,13 @@ export default function Dashboard() {
             <button className="btn btn-ghost" style={{ fontSize: 13, padding: '4px 8px' }} onClick={() => navigate('/sequences')}>View all</button>
           </div>
           {sequences.map(seq => (
-            <div key={seq.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sequences/${seq.id}`)}>
+            <button key={seq.id} className="list-item" style={{ cursor: 'pointer', width: '100%', textAlign: 'left', font: 'inherit' }} onClick={() => navigate(`/sequences/${seq.id}`)}>
               <div className="list-item-left">
                 <div className="list-item-title">{seq.topic}</div>
                 <div className="list-item-sub">{format(new Date(seq.scheduled_date), 'EEE, d MMM')} · {seq.trainer_name}</div>
               </div>
               <span className={`badge badge-${seq.status}`}>{seq.status}</span>
-            </div>
+            </button>
           ))}
         </>
       )}

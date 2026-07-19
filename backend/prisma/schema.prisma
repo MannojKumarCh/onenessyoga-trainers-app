@@ -29,16 +29,26 @@ enum ResourceType {
   link
 }
 
+enum GoogleLinkStatus {
+  none
+  pending
+  approved
+  rejected
+}
+
 model User {
-  id            Int      @id @default(autoincrement())
-  name          String
-  email         String   @unique
-  password_hash String
-  role          Role
-  zoom_link     String?
-  is_active     Boolean  @default(true)
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  id                 Int              @id @default(autoincrement())
+  name               String
+  email              String           @unique
+  password_hash      String
+  role               Role
+  zoom_link          String?
+  is_active          Boolean          @default(true)
+  google_id          String?          @unique
+  google_link_status GoogleLinkStatus @default(none)
+  google_linked_at   DateTime?
+  created_at         DateTime         @default(now())
+  updated_at         DateTime         @updatedAt
 
   sessions_assigned  Session[]          @relation("SessionTrainer")
   sessions_created   Session[]          @relation("SessionCreator")
@@ -48,6 +58,7 @@ model User {
   sequences_created  Sequence[]         @relation("SequenceCreator")
   resources_created  Resource[]
   push_subscriptions PushSubscription[]
+  notifications      Notification[]
 
   @@map("users")
 }
@@ -143,4 +154,19 @@ model PushSubscription {
   created_at        DateTime @default(now())
 
   @@map("push_subscriptions")
+}
+
+model Notification {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  title      String
+  body       String
+  url        String?
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([user_id, is_read])
+  @@index([user_id, created_at])
+  @@map("notifications")
 }

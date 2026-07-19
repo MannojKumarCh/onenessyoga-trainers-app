@@ -1,6 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import PushNotificationsPrompt from './PushNotificationsPrompt';
+import NotificationBell from './NotificationBell';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: '⊞', exact: true },
@@ -21,9 +22,12 @@ export default function AdminLayout() {
         gap: 8, fontSize: 13, fontWeight: 600
       }}>
         <span><span>🧘</span> Oneness Yoga — Admin</span>
-        <button onClick={logout} style={{ color: '#fff', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-          Logout
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <NotificationBell />
+          <button onClick={logout} style={{ color: '#fff', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+            Logout
+          </button>
+        </div>
       </div>
       <PushNotificationsPrompt />
       <div style={{ flex: 1, overflow: 'hidden' }}>

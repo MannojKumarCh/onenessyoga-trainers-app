@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { format } from 'date-fns';
 import Modal from '../../components/Modal';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 export default function SessionDetail() {
   const { id } = useParams();
@@ -13,6 +14,7 @@ export default function SessionDetail() {
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     client.get(`/sessions/${id}`).then(r => {
@@ -23,14 +25,27 @@ export default function SessionDetail() {
 
   async function saveNotes() {
     setSaving(true);
-    await client.patch(`/sessions/${id}/notes`, { notes }).catch(() => {});
-    setSaving(false);
+    setError('');
+    try {
+      await client.patch(`/sessions/${id}/notes`, { notes });
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to save notes'));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function markComplete() {
     setCompleting(true);
-    await client.patch(`/sessions/${id}/complete`, { notes });
-    navigate(-1);
+    setError('');
+    try {
+      await client.patch(`/sessions/${id}/complete`, { notes });
+      navigate(-1);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to mark session complete'));
+    } finally {
+      setCompleting(false);
+    }
   }
 
   if (loadError) return <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load this session. Please try again.</p></div>;
@@ -78,6 +93,8 @@ export default function SessionDetail() {
         />
       </div>
 
+      {error && !showConfirm && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
+
       {!session.is_completed && (
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-outline" onClick={saveNotes} disabled={saving} style={{ flex: 1 }}>
@@ -98,6 +115,7 @@ export default function SessionDetail() {
       {showConfirm && (
         <Modal title="Confirm Completion" onClose={() => setShowConfirm(false)}>
             <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>Mark this session as completed? This cannot be undone.</p>
+            {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowConfirm(false)}>Cancel</button>
               <button className="btn btn-primary" style={{ flex: 1 }} onClick={markComplete} disabled={completing}>

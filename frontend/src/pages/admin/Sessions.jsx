@@ -59,8 +59,13 @@ export default function AdminSessions() {
 
   async function deleteSession(id) {
     setDeleteId(null);
-    await client.delete(`/sessions/${id}`);
-    load();
+    setError('');
+    try {
+      await client.delete(`/sessions/${id}`);
+      load();
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to delete session'));
+    }
   }
 
   const grouped = groupByDate(sessions);
@@ -76,6 +81,8 @@ export default function AdminSessions() {
         <label className="label" htmlFor="sessions-from-date">From date</label>
         <input id="sessions-from-date" className="input" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
       </div>
+
+      {error && !showForm && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
 
       {loading ? <div className="loading">Loading…</div> : loadError ? (
         <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load sessions. Please try again.</p></div>

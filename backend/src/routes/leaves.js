@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { sendToUser } = require('../utils/push');
+const { notifyUser } = require('../utils/notify');
 const asyncHandler = require('../utils/asyncHandler');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
@@ -61,7 +61,7 @@ router.patch('/:id/review', authenticate, requireRole('super_admin'), async (req
     data: { status, admin_note: admin_note || null, reviewed_by: req.user.id, reviewed_at: new Date() }
   });
 
-  await sendToUser(leave.trainer_id, {
+  await notifyUser(leave.trainer_id, {
     title: `Leave ${status === 'approved' ? 'Approved' : 'Rejected'}`,
     body: `Your leave from ${leave.from_date} to ${leave.to_date} has been ${status}.${admin_note ? ' Note: ' + admin_note : ''}`,
     url: '/leaves'

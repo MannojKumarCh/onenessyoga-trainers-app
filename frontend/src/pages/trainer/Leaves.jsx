@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import client from '../../api/client';
 import Modal from '../../components/Modal';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 export default function Leaves() {
   const [leaves, setLeaves] = useState([]);
@@ -27,15 +28,20 @@ export default function Leaves() {
       setForm({ from_date: '', to_date: '', reason: '' });
       load();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to apply');
+      setError(getApiErrorMessage(err, 'Failed to apply'));
     } finally {
       setSubmitting(false);
     }
   }
 
   async function cancel(id) {
-    await client.delete(`/leaves/${id}`);
-    load();
+    setError('');
+    try {
+      await client.delete(`/leaves/${id}`);
+      load();
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to cancel leave'));
+    }
   }
 
   if (loading) return <div className="loading">Loading…</div>;
@@ -46,6 +52,8 @@ export default function Leaves() {
         <h1 className="page-title">Leaves</h1>
         <button className="btn btn-primary" style={{ padding: '8px 16px' }} onClick={() => setShowForm(true)}>+ Apply</button>
       </div>
+
+      {error && !showForm && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
 
       {loadError ? (
         <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load leaves. Please try again.</p></div>

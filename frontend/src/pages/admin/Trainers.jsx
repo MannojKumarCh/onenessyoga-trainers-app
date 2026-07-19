@@ -4,6 +4,7 @@ import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import PasswordInput from '../../components/PasswordInput';
 import { useAuth } from '../../context/AuthContext';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 const EMPTY = { name: '', email: '', password: '', role: 'trainer', zoom_link: '' };
 
@@ -18,7 +19,12 @@ export default function AdminTrainers() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [resetPw, setResetPw] = useState({ show: false, id: null, password: '' });
+  const [resetPwError, setResetPwError] = useState('');
+  const [resetPwSubmitting, setResetPwSubmitting] = useState(false);
   const [deactivating, setDeactivating] = useState(null);
+  const [actionError, setActionError] = useState('');
+  const [googleActionError, setGoogleActionError] = useState('');
+  const [googleActionSubmittingId, setGoogleActionSubmittingId] = useState(null);
 
   function load() {
     client.get('/users').then(r => setUsers(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
@@ -46,7 +52,7 @@ export default function AdminTrainers() {
       setShowForm(false);
       load();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed');
+      setError(getApiErrorMessage(err, 'Failed'));
     } finally {
       setSubmitting(false);
     }
@@ -55,21 +61,52 @@ export default function AdminTrainers() {
   async function toggleActive(u) {
     if (u.id === currentUser?.id) return;
     if (u.is_active) { setDeactivating(u); return; }
-    await client.put(`/users/${u.id}`, { is_active: 1 });
-    load();
+    setActionError('');
+    try {
+      await client.put(`/users/${u.id}`, { is_active: 1 });
+      load();
+    } catch (err) {
+      setActionError(getApiErrorMessage(err, 'Failed to activate trainer'));
+    }
   }
 
   async function confirmDeactivate() {
     const u = deactivating;
     setDeactivating(null);
-    await client.put(`/users/${u.id}`, { is_active: 0 });
-    load();
+    setActionError('');
+    try {
+      await client.put(`/users/${u.id}`, { is_active: 0 });
+      load();
+    } catch (err) {
+      setActionError(getApiErrorMessage(err, 'Failed to deactivate trainer'));
+    }
   }
 
   async function resetPassword(e) {
     e.preventDefault();
-    await client.put(`/users/${resetPw.id}/reset-password`, { password: resetPw.password });
-    setResetPw({ show: false, id: null, password: '' });
+    setResetPwError('');
+    setResetPwSubmitting(true);
+    try {
+      await client.put(`/users/${resetPw.id}/reset-password`, { password: resetPw.password });
+      setResetPw({ show: false, id: null, password: '' });
+    } catch (err) {
+      setResetPwError(getApiErrorMessage(err, 'Failed to reset password'));
+    } finally {
+      setResetPwSubmitting(false);
+    }
+  }
+
+  async function actOnGoogleLink(u, status) {
+    setGoogleActionError('');
+    setGoogleActionSubmittingId(u.id);
+    try {
+      await client.put(`/users/${u.id}/google-link`, { status });
+      load();
+    } catch (err) {
+      setGoogleActionError(getApiErrorMessage(err, 'Failed to update Google link request'));
+    } finally {
+      setGoogleActionSubmittingId(null);
+    }
   }
 
   if (loading) return <div className="loading">Loading…</div>;
@@ -82,16 +119,42 @@ export default function AdminTrainers() {
         <button className="btn btn-primary" style={{ padding: '8px 16px' }} onClick={openAdd}>+ Add</button>
       </div>
 
+      {actionError && <p className="error-text" style={{ marginBottom: 12 }}>{actionError}</p>}
+      {googleActionError && <p className="error-text" style={{ marginBottom: 12 }}>{googleActionError}</p>}
+
       {users.map(u => (
-        <div key={u.id} className="list-item">
+        <div key={u.id} className="list-item" style={{ flexWrap: 'wrap' }}>
           <div className="list-item-left">
             <div className="list-item-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {u.name}
               {!u.is_active && <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 400 }}>(inactive)</span>}
+              {u.google_link_status === 'pending' && <span className="badge badge-pending">Google: Pending</span>}
+              {u.google_link_status === 'approved' && <span className="badge badge-approved">Google: Linked</span>}
+              {u.google_link_status === 'rejected' && <span className="badge badge-rejected">Google: Rejected</span>}
             </div>
             <div className="list-item-sub">{u.email} · {u.role.replace('_', ' ')}</div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {u.google_link_status === 'pending' && (
+              <>
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12, padding: '6px 10px', color: 'var(--success)' }}
+                  disabled={googleActionSubmittingId === u.id}
+                  onClick={() => actOnGoogleLink(u, 'approved')}
+                >
+                  Approve Google
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: 12, padding: '6px 10px', color: 'var(--danger)' }}
+                  disabled={googleActionSubmittingId === u.id}
+                  onClick={() => actOnGoogleLink(u, 'rejected')}
+                >
+                  Reject Google
+                </button>
+              </>
+            )}
             <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 10px' }} onClick={() => openEdit(u)}>Edit</button>
             <button className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 10px' }} onClick={() => setResetPw({ show: true, id: u.id, password: '' })}>Reset PW</button>
             {u.id !== currentUser?.id && (
@@ -150,9 +213,12 @@ export default function AdminTrainers() {
                 <label className="label" htmlFor="reset-password">New Password</label>
                 <PasswordInput id="reset-password" value={resetPw.password} onChange={e => setResetPw(p => ({ ...p, password: e.target.value }))} required minLength={8} />
               </div>
+              {resetPwError && <p className="error-text" style={{ marginBottom: 12 }}>{resetPwError}</p>}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setResetPw({ show: false, id: null, password: '' })}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Reset</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={resetPwSubmitting}>
+                  {resetPwSubmitting ? 'Resetting…' : 'Reset'}
+                </button>
               </div>
             </form>
         </Modal>

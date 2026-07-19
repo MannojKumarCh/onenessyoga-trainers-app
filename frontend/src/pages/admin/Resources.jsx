@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import client from '../../api/client';
 import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 export default function AdminResources() {
   const [data, setData] = useState({ items: [], breadcrumb: [] });
@@ -33,7 +34,7 @@ export default function AdminResources() {
       setForm({ name: '', type: 'folder', url: '', thumbnail_url: '' });
       load(folderId);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed');
+      setError(getApiErrorMessage(err, 'Failed'));
     } finally {
       setSubmitting(false);
     }
@@ -41,8 +42,13 @@ export default function AdminResources() {
 
   async function deleteItem(id) {
     setDeleteId(null);
-    await client.delete(`/resources/${id}`);
-    load(folderId);
+    setError('');
+    try {
+      await client.delete(`/resources/${id}`);
+      load(folderId);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to delete item'));
+    }
   }
 
   return (
@@ -51,6 +57,8 @@ export default function AdminResources() {
         <h1 className="page-title">Resources</h1>
         <button className="btn btn-primary" style={{ padding: '8px 16px' }} onClick={() => setShowForm(true)}>+ Add</button>
       </div>
+
+      {error && !showForm && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
 
       {data.breadcrumb.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>

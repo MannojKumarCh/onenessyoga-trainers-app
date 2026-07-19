@@ -1,5 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom';
 import PushNotificationsPrompt from './PushNotificationsPrompt';
+import NotificationBell from './NotificationBell';
+import { useAuth } from '../context/AuthContext';
 
 const NAV = [
   { to: '/', label: 'Home', icon: '⊞', exact: true },
@@ -11,8 +13,22 @@ const NAV = [
 ];
 
 export default function TrainerLayout() {
+  const { logout } = useAuth();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div style={{
+        background: 'var(--primary)', color: '#fff', padding: '12px 16px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 8, fontSize: 13, fontWeight: 600
+      }}>
+        <span><span>🧘</span> Oneness Yoga — Trainer</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <NotificationBell />
+          <button onClick={logout} style={{ color: '#fff', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+            Logout
+          </button>
+        </div>
+      </div>
       <PushNotificationsPrompt />
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <Outlet />
