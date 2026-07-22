@@ -5,6 +5,7 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const { sendWelcomeEmail, sendGoogleLinkDecisionEmail } = require('../utils/mail');
 const { notifyUser } = require('../utils/notify');
+const { shareSpreadsheetWithTrainer } = require('../utils/sheets');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
   const original = router[method].bind(router);
@@ -102,6 +103,18 @@ router.put('/:id/google-link', authenticate, requireRole('super_admin'), async (
   }).catch(err => console.error('Failed to send Google-link decision notification:', err));
 
   await sendGoogleLinkDecisionEmail(user, status).catch(err => console.error('Failed to send Google-link decision email:', err));
+
+  if (status === 'approved') {
+    const now = new Date();
+    const year_month = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    prisma.monthlySheet.findUnique({ where: { year_month } })
+      .then(monthlySheet => {
+        if (monthlySheet) {
+          return shareSpreadsheetWithTrainer(monthlySheet.spreadsheet_id, user.email);
+        }
+      })
+      .catch(err => console.error('Failed to share monthly sheet:', err));
+  }
 
   res.json({ success: true });
 });

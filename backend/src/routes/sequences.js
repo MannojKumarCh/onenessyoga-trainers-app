@@ -3,6 +3,7 @@ const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { notifyUser, notifyAll } = require('../utils/notify');
 const asyncHandler = require('../utils/asyncHandler');
+const { upsertSequenceInSheet } = require('../utils/sheets');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
   const original = router[method].bind(router);
@@ -155,6 +156,14 @@ router.post('/notify-week', authenticate, requireRole('super_admin', 'sequence_c
   res.json({ success: true });
 });
 
+// Shared transition: mark a sequence as uploaded with its Google Sheet link.
+async function markUploaded(id, link) {
+  return prisma.sequence.update({
+    where: { id },
+    data: { google_sheet_link: link, status: 'uploaded', uploaded_at: new Date() }
+  });
+}
+
 // Assigned trainer: upload Google Sheet link
 router.patch('/:id/upload', authenticate, requireRole('trainer'), async (req, res) => {
   const { google_sheet_link } = req.body;
@@ -165,12 +174,52 @@ router.patch('/:id/upload', authenticate, requireRole('trainer'), async (req, re
   if (!seq) return res.status(404).json({ error: 'Not found' });
   if (seq.assigned_trainer_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
-  await prisma.sequence.update({
-    where: { id },
-    data: { google_sheet_link: google_sheet_link.trim(), status: 'uploaded', uploaded_at: new Date() }
-  });
+  await markUploaded(id, google_sheet_link.trim());
 
   res.json({ success: true });
+});
+
+// Assigned trainer: build sequence content in-app and auto-generate/update the Google Sheet
+router.post('/:id/build', authenticate, requireRole('trainer'), async (req, res) => {
+  const { items } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'items must be a non-empty array' });
+  }
+  for (const it of items) {
+    if (!it || typeof it.name !== 'string' || !it.name.trim()) {
+      return res.status(400).json({ error: 'Every item requires a non-empty name' });
+    }
+  }
+
+  const id = parseInt(req.params.id);
+  const seq = await prisma.sequence.findUnique({
+    where: { id },
+    include: { assigned_trainer: { select: { name: true } } }
+  });
+  if (!seq) return res.status(404).json({ error: 'Not found' });
+  if (seq.assigned_trainer_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+  await prisma.$transaction([
+    prisma.sequenceItem.deleteMany({ where: { sequence_id: id } }),
+    prisma.sequenceItem.createMany({
+      data: items.map((it, i) => ({
+        sequence_id: id,
+        sort_order: i,
+        name: it.name.trim(),
+        remarks: it.remarks || null,
+        reference_url: it.reference_url || null
+      }))
+    })
+  ]);
+
+  const link = await upsertSequenceInSheet(seq, items);
+
+  if (link) {
+    await markUploaded(id, link);
+    return res.json({ success: true, sheetSynced: true, google_sheet_link: link });
+  }
+
+  res.json({ success: true, sheetSynced: false });
 });
 
 // Assigned trainer: notify entire team about their uploaded sequence
