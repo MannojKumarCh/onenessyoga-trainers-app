@@ -2,7 +2,7 @@
 
 A living record of features and fixes implemented via Claude Code sessions. Update this file as work continues; don't let it go stale.
 
-Last updated: 2026-07-22
+Last updated: 2026-07-27
 
 ---
 
@@ -85,7 +85,7 @@ Built because browser push notifications proved unreliable to test (permission-s
 
 ---
 
-## 5. In-app sequence builder + Google Sheets sync (in progress, **not yet committed**)
+## 5. In-app sequence builder + Google Sheets sync (commit `683c5d4`, plus uncommitted domain-wide-delegation fix)
 
 The second major feature requested. Today a trainer manually builds their class sequence in an external Google Sheet and pastes the link (`PATCH /sequences/:id/upload`, unchanged, still works). This adds an in-app alternative.
 
@@ -94,20 +94,23 @@ The second major feature requested. Today a trainer manually builds their class 
 - Both submission paths stay available — manual paste-link and the new in-app builder.
 - Spreadsheets are shared as editor with `mannoj@onenessyoga.in` (a Google Workspace account on the onenessyoga.in domain) and with every trainer whose `google_link_status === 'approved'` (using their existing `User.email`, no new field needed). Sharing is dynamic — approving a trainer after a month's spreadsheet already exists retroactively shares it with them too.
 
-**Schema** (uncommitted): new `SequenceItem` (`sequence_id`, `sort_order`, `name`, `remarks?`, `reference_url?`) and `MonthlySheet` (`year_month` unique, `spreadsheet_id`) models. Migration: `20260722162832_add_sequence_items_and_monthly_sheets` (applied to the local DB, not yet committed to git).
+**Schema**: new `SequenceItem` (`sequence_id`, `sort_order`, `name`, `remarks?`, `reference_url?`) and `MonthlySheet` (`year_month` unique, `spreadsheet_id`) models. Migration: `20260722162832_add_sequence_items_and_monthly_sheets`.
 
-**Backend (uncommitted)**:
+**Backend**:
 - **`backend/src/utils/sheets.js`** (new) — same defensive lazy-init pattern as `mail.js`: `sheetsClient` is `null` when `GOOGLE_SERVICE_ACCOUNT_KEY` is unset, every function warns+no-ops instead of throwing. `upsertSequenceInSheet(sequence, items)` finds-or-creates the month's spreadsheet, finds-or-creates the day's tab (yellow header row, matching the target visual style), and appends this trainer's section below any others already in that tab. `shareSpreadsheetWithTrainer(spreadsheetId, email)` used both at spreadsheet-creation time and for the dynamic re-share.
 - **`backend/src/routes/sequences.js`** — new `POST /:id/build` (trainer-only, same ownership check as `/upload`): replaces that sequence's `SequenceItem` rows (delete-then-recreate) and calls `upsertSequenceInSheet`. Extracted a shared `markUploaded(id, link)` helper so both `/upload` and `/build` use one status-transition code path instead of duplicating it.
 - **`backend/src/routes/users.js`** — the Google-link approval handler now also shares the current month's spreadsheet (if one exists) with a newly-approved trainer.
 
-**Frontend (uncommitted)**:
-- **`frontend/src/pages/trainer/SequenceDetail.jsx`** — new "Build Sequence" button/modal next to the existing "Upload Google Sheet Link" button (both shown while `status === 'pending'`). The builder renders a spreadsheet-style grid (thin gridlines, header row: Exercise / Remarks / Reference) with a small "+" icon button top-right to add rows, and a "×" remove button per row. Submits to `POST /sequences/:id/build`.
+**Frontend**:
+- **`frontend/src/pages/trainer/SequenceDetail.jsx`** — new "Build Sequence" button/modal next to the existing "Upload Google Sheet Link" button (both shown while `status === 'pending'`). The builder renders a true spreadsheet-style grid (thin gridlines between cells, header row: Exercise / Remarks / Reference) with a small "+" icon button top-right to add rows, and a "×" remove button per row. Submits to `POST /sequences/:id/build`.
 
-**Status**:
-- ✅ Database save confirmed working end-to-end (verified via direct DB query after a real UI submission).
-- ⏳ Google Sheets sync **not yet testable** — requires `GOOGLE_SERVICE_ACCOUNT_KEY` in `backend/.env`, which needs a Google Cloud service account (enable Sheets API + Drive API, create a service account, generate a JSON key) — **not yet set up**. Until then, `POST /:id/build` responds with `{ success: true, sheetSynced: false }` and the sequence correctly stays in `pending` status rather than falsely marking itself `uploaded`.
-- Not yet committed to git (schema, `sheets.js`, and the two route files are still local-only changes).
+**Getting Sheets sync actually working — real gotchas hit and fixed (uncommitted as of this writing):**
+1. **Service account key creation was org-blocked** (`iam.disableServiceAccountKeyCreation` constraint, part of Google's newer "Secure by Default" policy). Fixed by overriding the org policy for just the `oneness-yoga-app` project (Organization Policies → "Disable service account key creation (Legacy)" → Override parent's policy → Off), requiring the `Organization Policy Administrator` IAM role.
+2. **Bare service accounts have no Drive storage quota** — a plain `spreadsheets.create` call fails with a generic 403 "The caller does not have permission." First attempted fix (share a specific Drive folder with the service account as Editor, create files into it) got further but still failed with "The user's Drive storage quota has been exceeded" — because a service account creating a file inside someone else's regular ("My Drive") folder still becomes that file's *owner* by default, and service accounts always have zero quota.
+3. **Real fix: Domain-Wide Delegation.** The service account now impersonates `mannoj@onenessyoga.in` (via `google.auth.JWT`'s `subject` option) when creating/editing sheets, so every file is genuinely owned by that real Workspace account. Setup required: (a) note the service account's numeric Client ID from its JSON key, (b) authorize that Client ID for the `spreadsheets`+`drive` scopes in Google Workspace Admin Console → Security → API Controls → Domain-wide Delegation. New files are still created inside the shared Drive folder (`GOOGLE_SEQUENCES_FOLDER_ID`) for organization, but ownership now correctly resolves to a real account.
+4. The downloaded service account JSON key lives in `Google Key/` at the project root — added to `.gitignore` immediately (`Google Key/`, `*.json.key`) since it was briefly untracked-but-present; never committed.
+
+**Status**: ✅ **fully working, verified end-to-end** — a real trainer submission via the in-app builder created an actual Google Spreadsheet, correct day tab with yellow header formatting, correct trainer/topic sub-header and exercise rows, `Sequence.status` flipped to `uploaded` with the real `google_sheet_link`, and the `MonthlySheet` registry row was created correctly. Test data cleaned up after verification.
 
 ---
 
@@ -120,7 +123,8 @@ The second major feature requested. Today a trainer manually builds their class 
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_EMAIL` | Browser push | ✅ set (pre-existing) |
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Transactional email | ✅ set, domain verified |
 | `GOOGLE_CLIENT_ID` | Google Sign-In token verification | ✅ set |
-| `GOOGLE_SERVICE_ACCOUNT_KEY` | Google Sheets/Drive API (service account, base64 JSON) | ❌ **not yet set** — blocks Sheets sync testing |
+| `GOOGLE_SERVICE_ACCOUNT_KEY` | Google Sheets/Drive API (service account, base64 JSON) | ✅ set, domain-wide delegation configured, tested working |
+| `GOOGLE_SEQUENCES_FOLDER_ID` | Drive folder new monthly spreadsheets are created into | ✅ set (`1cWsiP2yOf2E-lHsL3CbYVvczrRm1DTBv`) |
 | `FRONTEND_URL` | CORS + email links | not set — defaults to `http://localhost:5173` |
 
 **`frontend/.env`**:
@@ -142,6 +146,6 @@ The second major feature requested. Today a trainer manually builds their class 
 
 ## Known gaps / not yet done
 
-1. **Google Sheets service account** — needs to be created (see §5) before the sequence-builder-to-Sheets sync can be tested live.
-2. **Uncommitted work** — all of §5 (sequence builder + Sheets integration) is local-only; not yet committed or pushed.
+1. **Uncommitted work**: the domain-wide-delegation fix + folder-scoped sheet creation in `backend/src/utils/sheets.js`, plus the spreadsheet-style grid redesign of the "Build Sequence" modal in `frontend/src/pages/trainer/SequenceDetail.jsx`, plus the `.gitignore` entry for `Google Key/`, plus this log update — not yet committed/pushed as of this writing.
+2. **Not yet tested**: multiple trainers' sequences stacking correctly within the same day's tab (only single-trainer submission verified so far); the dynamic re-share firing correctly when a trainer's Google link is approved after a month's spreadsheet already exists.
 3. Minor pre-existing findings from the original agent reviews that were deliberately deferred (not breaking): dependency version bumps (React 18→19, Express 4→5, Prisma 6→7, etc.), `parseInt` NaN validation on route params, N+1 query in bulk session creation, no DB connect timeout, no startup env-var validation, a few low-severity UX polish items. Full detail in `Agent Reviews/`.

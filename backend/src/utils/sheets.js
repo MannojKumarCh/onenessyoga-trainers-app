@@ -3,12 +3,23 @@ const prisma = require('../db/db');
 
 const OWNER_EMAIL = 'mannoj@onenessyoga.in';
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive'];
+// Service accounts have no Drive storage of their own — new spreadsheets must be created
+// inside a folder owned by a real account (shared with the service account as Editor),
+// otherwise Google rejects file creation with a generic 403 "forbidden".
+const SEQUENCES_FOLDER_ID = process.env.GOOGLE_SEQUENCES_FOLDER_ID;
 
 function buildClient() {
   try {
     const decoded = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf8');
     const credentials = JSON.parse(decoded);
-    const auth = new google.auth.GoogleAuth({ credentials, scopes: SCOPES });
+    // Domain-wide delegation: impersonate a real Workspace account so created files are
+    // owned by a real user (with real storage quota) instead of the service account itself.
+    const auth = new google.auth.JWT({
+      email: credentials.client_email,
+      key: credentials.private_key,
+      scopes: SCOPES,
+      subject: OWNER_EMAIL
+    });
     return {
       sheets: google.sheets({ version: 'v4', auth }),
       drive: google.drive({ version: 'v3', auth })
@@ -56,12 +67,16 @@ async function findOrCreateMonthlySheet(year_month, scheduled_date) {
   if (monthlySheet) return monthlySheet;
 
   const title = `Oneness Yoga Sequences - ${monthTitleOf(scheduled_date)}`;
-  const createResp = await sheetsClient.sheets.spreadsheets.create({
+  const createResp = await sheetsClient.drive.files.create({
     requestBody: {
-      properties: { title }
-    }
+      name: title,
+      mimeType: 'application/vnd.google-apps.spreadsheet',
+      ...(SEQUENCES_FOLDER_ID ? { parents: [SEQUENCES_FOLDER_ID] } : {})
+    },
+    fields: 'id',
+    supportsAllDrives: true
   });
-  const spreadsheetId = createResp.data.spreadsheetId;
+  const spreadsheetId = createResp.data.id;
 
   const approvedTrainers = await prisma.user.findMany({
     where: { role: 'trainer', google_link_status: 'approved' },
