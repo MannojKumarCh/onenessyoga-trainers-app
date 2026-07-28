@@ -78,7 +78,11 @@ export default function SequenceDetail() {
 
   function openBuilder() {
     setBuilderError('');
-    setBuilderItems([{ ...EMPTY_ITEM }]);
+    setBuilderItems(
+      seq.items && seq.items.length > 0
+        ? seq.items.map(it => ({ name: it.name, remarks: it.remarks || '', reference_url: it.reference_url || '' }))
+        : [{ ...EMPTY_ITEM }]
+    );
     setShowBuilder(true);
   }
 
@@ -170,17 +174,51 @@ export default function SequenceDetail() {
         </div>
       )}
 
+      {seq.items && seq.items.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <p style={{ fontWeight: 700, marginBottom: 12 }}>Sequence Content</p>
+          {seq.items.map((item, i) => (
+            <div
+              key={item.id}
+              style={{
+                padding: '10px 0',
+                borderBottom: i < seq.items.length - 1 ? '1px solid var(--border)' : 'none'
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{i + 1}. {item.name}</div>
+              {item.remarks && (
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>{item.remarks}</div>
+              )}
+              {item.reference_url && (
+                <a
+                  href={item.reference_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: 12, wordBreak: 'break-all', display: 'inline-block', marginTop: 2 }}
+                >
+                  Reference
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {msg && <p style={{ textAlign: 'center', color: 'var(--success)', marginBottom: 12, fontWeight: 600 }}>{msg}</p>}
 
-      {isAssigned && seq.status === 'pending' && (
+      {isAssigned && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <button className="btn btn-primary btn-full" onClick={openUpload}>Upload Google Sheet Link</button>
-          <button className="btn btn-ghost btn-full" onClick={openBuilder}>Build Sequence</button>
+          <button className="btn btn-primary btn-full" onClick={openUpload}>
+            {seq.status === 'pending' ? 'Upload Google Sheet Link' : 'Edit Google Sheet Link'}
+          </button>
+          <button className="btn btn-ghost btn-full" onClick={openBuilder}>
+            {seq.status === 'pending' ? 'Build Sequence' : 'Edit Sequence'}
+          </button>
         </div>
       )}
 
       {isAssigned && seq.status === 'uploaded' && !seq.notified_team_at && (
-        <button className="btn btn-primary btn-full" onClick={notifyTeam} disabled={notifying}>
+        <button className="btn btn-primary btn-full" onClick={notifyTeam} disabled={notifying} style={{ marginTop: 10 }}>
           {notifying ? 'Notifying…' : 'Notify Team'}
         </button>
       )}
