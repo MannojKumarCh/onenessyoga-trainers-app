@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import client from '../../api/client';
 import { format, startOfWeek } from 'date-fns';
 import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { ExclamationTriangleIcon, QueueListIcon, PlusIcon } from '@heroicons/react/24/outline';
+import usePolling from '../../hooks/usePolling';
+import { useToast } from '../../context/ToastContext';
 
 export default function AdminSequences() {
   const [sequences, setSequences] = useState([]);
@@ -20,16 +23,18 @@ export default function AdminSequences() {
   const [notice, setNotice] = useState({ type: '', text: '' });
   const [deleteId, setDeleteId] = useState(null);
 
+  const { showToast } = useToast();
+
   function getWeekStart(dateStr) {
     return format(startOfWeek(new Date(dateStr), { weekStartsOn: 1 }), 'yyyy-MM-dd');
   }
 
-  function load() {
+  const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
     const q = selectedWeek ? `?week=${selectedWeek}` : '';
     client.get(`/sequences${q}`).then(r => setSequences(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
-  }
+  }, [selectedWeek]);
 
   useEffect(() => {
     Promise.all([client.get('/sequences/weeks'), client.get('/users/trainers')]).then(([w, t]) => {
@@ -40,7 +45,8 @@ export default function AdminSequences() {
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
-  useEffect(() => { if (!selectedWeek) return; load(); }, [selectedWeek]);
+  useEffect(() => { if (!selectedWeek) return; load(); }, [selectedWeek, load]);
+  usePolling(load, 30000);
 
   async function submit(e) {
     e.preventDefault();
@@ -55,6 +61,7 @@ export default function AdminSequences() {
 
       const week_start_date = getWeekStart(form.scheduled_date);
       await client.post('/sequences', { ...form, assigned_trainer_id: assignedTrainerId, week_start_date });
+      showToast('Sequence Saved Successfully');
       setShowForm(false);
       setForm({ scheduled_date: '', topic: '', assigned_trainer_id: '', instructions: '' });
       if (!weeks.includes(week_start_date)) setWeeks([week_start_date, ...weeks]);
@@ -71,6 +78,7 @@ export default function AdminSequences() {
     setNotice({ type: '', text: '' });
     try {
       await client.post('/sequences/notify-week', { week_start_date: selectedWeek });
+      showToast('Trainers Notified');
       setNotice({ type: 'success', text: 'Trainers notified!' });
     } catch (err) {
       setNotice({ type: 'error', text: getApiErrorMessage(err, 'Failed to notify trainers') });
@@ -83,6 +91,7 @@ export default function AdminSequences() {
     setDeleteId(null);
     try {
       await client.delete(`/sequences/${id}`);
+      showToast('Sequence Deleted');
       setNotice({ type: 'success', text: 'Sequence deleted.' });
       load();
     } catch (err) {
@@ -94,7 +103,7 @@ export default function AdminSequences() {
     <div className="page">
       <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 className="page-title">Sequences</h1>
-        <button className="btn btn-primary" style={{ padding: '8px 16px' }} onClick={() => setShowForm(true)}>+ Add</button>
+        <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowForm(true)}><PlusIcon style={{ width: 16, height: 16 }} /> Add Sequence</button>
       </div>
 
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
@@ -136,9 +145,9 @@ export default function AdminSequences() {
       )}
 
       {loading ? <div className="loading">Loading…</div> : loadError ? (
-        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load sequences. Please try again.</p></div>
+        <div className="empty-state"><div className="empty-state-icon"><ExclamationTriangleIcon style={{ width: 20, height: 20 }} /></div><p>Couldn't load sequences. Please try again.</p></div>
       ) : sequences.length === 0 ? (
-        <div className="empty-state"><div className="empty-state-icon">⊡</div><p>No sequences this week</p></div>
+        <div className="empty-state"><div style={{ display: 'flex', justifyContent: 'center', margin: '0 auto 12px' }}><QueueListIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div><p>No sequences this week</p></div>
       ) : sequences.map(seq => (
         <div key={seq.id} className="list-item">
           <div className="list-item-left">
@@ -169,7 +178,7 @@ export default function AdminSequences() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="label" htmlFor="admin-seq-instructions">Instructions (optional)</label>
+                <label className="label" htmlFor="admin-seq-instructions">Instructions (Optional)</label>
                 <textarea id="admin-seq-instructions" className="input" rows={3} value={form.instructions} onChange={e => setForm(f => ({ ...f, instructions: e.target.value }))} />
               </div>
               {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}

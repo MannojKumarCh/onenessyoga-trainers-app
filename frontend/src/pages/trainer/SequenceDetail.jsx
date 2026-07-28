@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import client from '../../api/client';
 import { format } from 'date-fns';
 import Modal from '../../components/Modal';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { ExclamationTriangleIcon, ArrowLeftIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import usePolling from '../../hooks/usePolling';
+import { useToast } from '../../context/ToastContext';
 
 const EMPTY_ITEM = { name: '', remarks: '', reference_url: '' };
 
@@ -28,6 +31,7 @@ export default function SequenceDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [seq, setSeq] = useState(null);
   const [loadError, setLoadError] = useState(false);
   const [link, setLink] = useState('');
@@ -41,14 +45,15 @@ export default function SequenceDetail() {
   const [builderSubmitting, setBuilderSubmitting] = useState(false);
   const [builderError, setBuilderError] = useState('');
 
-  function load() {
+  const load = useCallback(() => {
     client.get(`/sequences/${id}`).then(r => {
       setSeq(r.data);
       setLink(r.data.google_sheet_link || '');
     }).catch(() => setLoadError(true));
-  }
+  }, [id]);
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [load]);
+  usePolling(load, 30000);
 
   function openUpload() {
     setUploadError('');
@@ -62,6 +67,7 @@ export default function SequenceDetail() {
     try {
       await client.patch(`/sequences/${id}/upload`, { google_sheet_link: link.trim() });
       setShowUpload(false);
+      showToast('Google Sheet Uploaded');
       load();
     } catch (err) {
       setUploadError(err.response?.data?.error || 'Upload failed');
@@ -107,6 +113,7 @@ export default function SequenceDetail() {
     try {
       await client.post(`/sequences/${id}/build`, { items: filteredItems });
       setShowBuilder(false);
+      showToast('Sequence Saved Successfully');
       load();
     } catch (err) {
       setBuilderError(getApiErrorMessage(err, 'Failed to save sequence'));
@@ -120,6 +127,7 @@ export default function SequenceDetail() {
     try {
       await client.post(`/sequences/${id}/notify-team`);
       setMsg('Team notified!');
+      showToast('Team Notified');
       load();
     } catch (err) {
       setMsg(err.response?.data?.error || 'Failed to notify');
@@ -130,12 +138,14 @@ export default function SequenceDetail() {
 
   const isAssigned = String(seq?.assigned_trainer_id) === String(user?.id);
 
-  if (loadError) return <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load this sequence. Please try again.</p></div>;
+  if (loadError) return <div className="empty-state"><div style={{ display: 'flex', justifyContent: 'center' }}><ExclamationTriangleIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div><p>Couldn't load this sequence. Please try again.</p></div>;
   if (!seq) return <div className="loading">Loading…</div>;
 
   return (
     <div className="page">
-      <button onClick={() => navigate(-1)} style={{ color: 'var(--primary)', marginBottom: 16, fontSize: 15 }}>← Back</button>
+      <button onClick={() => navigate(-1)} style={{ color: 'var(--primary)', marginBottom: 16, fontSize: 15, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <ArrowLeftIcon style={{ width: 18, height: 18 }} /> Back
+      </button>
 
       <h1 style={{ fontSize: 22, fontWeight: 700 }}>{seq.topic}</h1>
       <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 4 }}>{format(new Date(seq.scheduled_date), 'EEEE, d MMMM yyyy')}</p>
@@ -143,7 +153,7 @@ export default function SequenceDetail() {
       <div className="card" style={{ marginTop: 20, marginBottom: 16 }}>
         {[
           ['Assigned Trainer', seq.trainer_name],
-          ['Status', <span className={`badge badge-${seq.status}`}>{seq.status}</span>],
+          ['Status', <span className={`badge badge-${seq.status}`}>{seq.status.charAt(0).toUpperCase() + seq.status.slice(1)}</span>],
           seq.google_sheet_link && ['Sheet Link', <a href={seq.google_sheet_link} target="_blank" rel="noreferrer" style={{ fontSize: 13, wordBreak: 'break-all' }}>Open Google Sheet</a>],
         ].filter(Boolean).map(([label, val]) => (
           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
@@ -207,16 +217,16 @@ export default function SequenceDetail() {
               <button
                 type="button"
                 onClick={addBuilderRow}
-                aria-label="Add row"
-                title="Add row"
+                aria-label="Add Row"
+                title="Add Row"
                 style={{
                   width: 28, height: 28, borderRadius: 6, border: '1px solid var(--primary)',
-                  background: 'var(--primary-light)', color: 'var(--primary)', fontSize: 18, fontWeight: 700,
-                  cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'var(--primary-light)', color: 'var(--primary)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                   padding: 0
                 }}
               >
-                +
+                <PlusIcon style={{ width: 16, height: 16 }} />
               </button>
             </div>
 
@@ -260,14 +270,14 @@ export default function SequenceDetail() {
                         onClick={() => removeBuilderRow(index)}
                         disabled={builderItems.length === 1}
                         aria-label={`Remove row ${index + 1}`}
-                        title="Remove row"
+                        title="Remove Row"
                         style={{
                           ...sheetCell(isLast, true), borderRight: 'none', color: 'var(--danger)',
                           cursor: builderItems.length === 1 ? 'not-allowed' : 'pointer',
                           opacity: builderItems.length === 1 ? 0.4 : 1
                         }}
                       >
-                        ×
+                        <XMarkIcon style={{ width: 16, height: 16 }} />
                       </button>
                     </div>
                   );

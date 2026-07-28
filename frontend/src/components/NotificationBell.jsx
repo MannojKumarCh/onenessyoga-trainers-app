@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { BellIcon } from '@heroicons/react/24/outline';
 import client from '../api/client';
 import { getApiErrorMessage } from '../utils/apiError';
 
@@ -17,7 +18,23 @@ export default function NotificationBell() {
       .catch(() => {});
   }, []);
 
+  // Refresh on navigation
   useEffect(() => { refreshCount(); }, [location.pathname, refreshCount]);
+
+  // Auto-refresh every 30 seconds + on visibility change
+  useEffect(() => {
+    const interval = setInterval(refreshCount, 30000);
+
+    function onVisibility() {
+      if (document.visibilityState === 'visible') refreshCount();
+    }
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [refreshCount]);
 
   function toggleOpen() {
     if (!open) {
@@ -47,17 +64,16 @@ export default function NotificationBell() {
       <button
         onClick={toggleOpen}
         aria-label="Notifications"
-        style={{
-          position: 'relative', background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: 20, color: '#fff', padding: 4, lineHeight: 1
-        }}
+        className="header-icon-btn"
+        style={{ position: 'relative' }}
       >
-        🔔
+        <BellIcon style={{ width: 21, height: 21 }} />
         {unreadCount > 0 && (
           <span style={{
-            position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, padding: '0 4px',
-            borderRadius: 999, background: 'var(--danger)', color: '#fff', fontSize: 10, fontWeight: 700,
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
+            position: 'absolute', top: 0, right: 0, minWidth: 16, height: 16, padding: '0 4px',
+            borderRadius: 999, background: 'var(--danger)', color: '#fff', fontSize: 9, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'pulse 2s ease-in-out infinite', boxShadow: '0 1px 4px rgba(255,59,48,0.4)'
           }}>
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
@@ -71,13 +87,13 @@ export default function NotificationBell() {
             style={{ position: 'fixed', inset: 0, zIndex: 90 }}
           />
           <div style={{
-            position: 'absolute', top: '100%', right: 0, marginTop: 8, width: 320, maxWidth: '90vw',
-            maxHeight: 400, overflowY: 'auto', background: 'var(--white)', borderRadius: 'var(--radius)',
-            border: '1px solid var(--border)', boxShadow: '0 8px 24px rgba(0,0,0,0.16)', zIndex: 91,
-            padding: 12
+            position: 'absolute', top: '100%', right: -8, marginTop: 8, width: 340, maxWidth: '90vw',
+            maxHeight: 420, overflowY: 'auto', background: 'var(--bg-elevated)', borderRadius: 'var(--radius)',
+            border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-lg)', zIndex: 91,
+            padding: 14, animation: 'modalEnter 0.2s ease-out'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Notifications</span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border-light)' }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Notifications</span>
               <button
                 onClick={viewAll}
                 style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}
@@ -89,8 +105,8 @@ export default function NotificationBell() {
             {error && <p className="error-text" style={{ fontSize: 13 }}>{error}</p>}
 
             {!error && items.length === 0 && (
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', padding: '16px 0' }}>
-                No new notifications
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>
+                No New Notifications
               </p>
             )}
 
@@ -100,12 +116,14 @@ export default function NotificationBell() {
                 onClick={() => handleItemClick(item)}
                 style={{
                   display: 'block', width: '100%', textAlign: 'left', font: 'inherit',
-                  padding: '10px 8px', borderRadius: 'var(--radius-sm)', border: 'none',
-                  background: 'none', cursor: 'pointer', borderBottom: '1px solid var(--border)'
+                  padding: '12px 10px', borderRadius: 'var(--radius-sm)', border: 'none',
+                  background: 'none', cursor: 'pointer', transition: 'background 0.15s'
                 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}
               >
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{item.title}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2, whiteSpace: 'pre-line' }}>{item.body}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3, whiteSpace: 'pre-line', lineHeight: 1.4 }}>{item.body}</div>
               </button>
             ))}
           </div>

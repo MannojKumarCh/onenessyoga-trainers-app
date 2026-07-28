@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import client from '../../api/client';
 import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import PasswordInput from '../../components/PasswordInput';
 import { useAuth } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { ExclamationTriangleIcon, PlusIcon } from '@heroicons/react/24/outline';
+import usePolling from '../../hooks/usePolling';
+import { useToast } from '../../context/ToastContext';
 
 const EMPTY = { name: '', email: '', password: '', role: 'trainer', zoom_link: '' };
 
@@ -26,10 +29,15 @@ export default function AdminTrainers() {
   const [googleActionError, setGoogleActionError] = useState('');
   const [googleActionSubmittingId, setGoogleActionSubmittingId] = useState(null);
 
-  function load() {
+  const { showToast } = useToast();
+
+  const load = useCallback(() => {
     client.get('/users').then(r => setUsers(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
-  }
-  useEffect(() => { load(); }, []);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+  
+  usePolling(load, 30000);
 
   function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setShowForm(true); }
   function openEdit(u) {
@@ -50,6 +58,7 @@ export default function AdminTrainers() {
         await client.post('/users', form);
       }
       setShowForm(false);
+      showToast('Trainer Saved Successfully');
       load();
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed'));
@@ -89,6 +98,7 @@ export default function AdminTrainers() {
     try {
       await client.put(`/users/${resetPw.id}/reset-password`, { password: resetPw.password });
       setResetPw({ show: false, id: null, password: '' });
+      showToast('Password Reset Successfully');
     } catch (err) {
       setResetPwError(getApiErrorMessage(err, 'Failed to reset password'));
     } finally {
@@ -101,6 +111,7 @@ export default function AdminTrainers() {
     setGoogleActionSubmittingId(u.id);
     try {
       await client.put(`/users/${u.id}/google-link`, { status });
+      showToast('Google Link Status Updated');
       load();
     } catch (err) {
       setGoogleActionError(getApiErrorMessage(err, 'Failed to update Google link request'));
@@ -110,13 +121,13 @@ export default function AdminTrainers() {
   }
 
   if (loading) return <div className="loading">Loading…</div>;
-  if (loadError) return <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load trainers. Please try again.</p></div>;
+  if (loadError) return <div className="empty-state"><div className="empty-state-icon"><ExclamationTriangleIcon style={{ width: 20, height: 20 }} /></div><p>Couldn't load trainers. Please try again.</p></div>;
 
   return (
     <div className="page">
       <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 className="page-title">Trainers</h1>
-        <button className="btn btn-primary" style={{ padding: '8px 16px' }} onClick={openAdd}>+ Add</button>
+        <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={openAdd}><PlusIcon style={{ width: 16, height: 16 }} /> Add Trainer</button>
       </div>
 
       {actionError && <p className="error-text" style={{ marginBottom: 12 }}>{actionError}</p>}
@@ -127,12 +138,12 @@ export default function AdminTrainers() {
           <div className="list-item-left">
             <div className="list-item-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {u.name}
-              {!u.is_active && <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 400 }}>(inactive)</span>}
+              {!u.is_active && <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 400 }}>(Inactive)</span>}
               {u.google_link_status === 'pending' && <span className="badge badge-pending">Google: Pending</span>}
               {u.google_link_status === 'approved' && <span className="badge badge-approved">Google: Linked</span>}
               {u.google_link_status === 'rejected' && <span className="badge badge-rejected">Google: Rejected</span>}
             </div>
-            <div className="list-item-sub">{u.email} · {u.role.replace('_', ' ')}</div>
+            <div className="list-item-sub">{u.email} · {u.role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {u.google_link_status === 'pending' && (
@@ -167,7 +178,7 @@ export default function AdminTrainers() {
       ))}
 
       {showForm && (
-        <Modal title={editing ? 'Edit User' : 'Add User'} onClose={() => setShowForm(false)}>
+        <Modal title={editing ? 'Edit Trainer' : 'Add Trainer'} onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
                 <label className="label" htmlFor="trainer-name">Name</label>

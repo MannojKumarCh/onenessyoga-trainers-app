@@ -1,21 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import client from '../../api/client';
 import { format } from 'date-fns';
 import { groupByDate } from '../../utils/date';
+import { ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import usePolling from '../../hooks/usePolling';
+import { useToast } from '../../context/ToastContext';
 
 export default function CompletedSessions() {
+  const { showToast } = useToast();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     client.get('/sessions/completed').then(r => setSessions(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { load(); }, [load]);
+  usePolling(load, 30000);
 
   const grouped = groupByDate(sessions);
 
   if (loading) return <div className="loading">Loading…</div>;
-  if (error) return <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load completed sessions. Please try again.</p></div>;
+  if (error) return <div className="empty-state"><div style={{ display: 'flex', justifyContent: 'center' }}><ExclamationTriangleIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div><p>Couldn't load completed sessions. Please try again.</p></div>;
 
   return (
     <div className="page">
@@ -25,7 +32,7 @@ export default function CompletedSessions() {
 
       {Object.keys(grouped).length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">✓</div>
+          <div style={{ display: 'flex', justifyContent: 'center' }}><CheckCircleIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div>
           <p>No completed sessions yet</p>
         </div>
       ) : Object.entries(grouped).map(([date, items]) => (

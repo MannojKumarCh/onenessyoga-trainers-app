@@ -2,6 +2,7 @@ const router = require('express').Router();
 const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
+const { notifyUser } = require('../utils/notify');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
   const original = router[method].bind(router);
@@ -125,6 +126,14 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
     }
   });
 
+  if (trainerId) {
+    notifyUser(trainerId, {
+      title: 'New Session Assigned',
+      body: `${title || 'Daily Session'} scheduled for ${scheduled_date} at ${scheduled_time}`,
+      url: '/sessions'
+    }).catch(() => {});
+  }
+
   res.status(201).json({ id: session.id });
 });
 
@@ -171,6 +180,15 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
     }
   });
 
+  const targetTrainerId = nextTrainerId ?? session.assigned_trainer_id;
+  if (targetTrainerId) {
+    notifyUser(targetTrainerId, {
+      title: 'Session Updated',
+      body: `Session "${title ?? session.title}" updated for ${scheduled_date ?? session.scheduled_date} at ${scheduled_time ?? session.scheduled_time}`,
+      url: '/sessions'
+    }).catch(() => {});
+  }
+
   res.json({ success: true });
 });
 
@@ -204,7 +222,17 @@ router.patch('/:id/notes', authenticate, requireRole('trainer'), async (req, res
 
 // Admin: delete session
 router.delete('/:id', authenticate, requireRole('super_admin'), async (req, res) => {
-  await prisma.session.delete({ where: { id: parseInt(req.params.id) } });
+  const id = parseInt(req.params.id);
+  const session = await prisma.session.findUnique({ where: { id } });
+  if (session && session.assigned_trainer_id) {
+    notifyUser(session.assigned_trainer_id, {
+      title: 'Session Cancelled',
+      body: `Session "${session.title}" on ${session.scheduled_date} at ${session.scheduled_time} was cancelled`,
+      url: '/sessions'
+    }).catch(() => {});
+  }
+
+  await prisma.session.delete({ where: { id } });
   res.json({ success: true });
 });
 

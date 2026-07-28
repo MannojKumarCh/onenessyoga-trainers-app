@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { format } from 'date-fns';
+import { ExclamationTriangleIcon, QueueListIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import usePolling from '../../hooks/usePolling';
+import { useToast } from '../../context/ToastContext';
 
 export default function Sequences() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [sequences, setSequences] = useState([]);
   const [weeks, setWeeks] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState('');
@@ -24,6 +28,13 @@ export default function Sequences() {
     setLoading(true);
     client.get(`/sequences?week=${selectedWeek}`).then(r => setSequences(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
   }, [selectedWeek]);
+
+  const load = useCallback(() => {
+    if (!selectedWeek) return;
+    client.get(`/sequences?week=${selectedWeek}`).then(r => setSequences(r.data)).catch(() => setError(true));
+  }, [selectedWeek]);
+
+  usePolling(load, 30000);
 
   return (
     <div className="page">
@@ -52,10 +63,10 @@ export default function Sequences() {
       )}
 
       {loading ? <div className="loading">Loading…</div> : error ? (
-        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load sequences. Please try again.</p></div>
+        <div className="empty-state"><div style={{ display: 'flex', justifyContent: 'center' }}><ExclamationTriangleIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div><p>Couldn't load sequences. Please try again.</p></div>
       ) : sequences.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">⊡</div>
+          <div style={{ display: 'flex', justifyContent: 'center' }}><QueueListIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div>
           <p>No sequences for this week</p>
         </div>
       ) : sequences.map(seq => (
@@ -65,7 +76,7 @@ export default function Sequences() {
             <div className="list-item-title">{seq.topic}</div>
             <div className="list-item-sub">{format(new Date(seq.scheduled_date), 'EEE, d MMM')} · {seq.trainer_name}</div>
           </div>
-          <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1l6 6-6 6" stroke="var(--text-secondary)" strokeWidth="1.5" strokeLinecap="round"/></svg>
+          <ChevronRightIcon style={{ width: 16, height: 16 }} />
         </div>
       ))}
     </div>

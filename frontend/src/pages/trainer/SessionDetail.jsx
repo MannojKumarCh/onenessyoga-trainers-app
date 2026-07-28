@@ -1,13 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { format } from 'date-fns';
 import Modal from '../../components/Modal';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { ExclamationTriangleIcon, ArrowLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import usePolling from '../../hooks/usePolling';
+import { useToast } from '../../context/ToastContext';
 
 export default function SessionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [session, setSession] = useState(null);
   const [loadError, setLoadError] = useState(false);
   const [notes, setNotes] = useState('');
@@ -16,18 +20,22 @@ export default function SessionDetail() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const load = useCallback(() => {
     client.get(`/sessions/${id}`).then(r => {
       setSession(r.data);
       setNotes(r.data.notes || '');
     }).catch(() => setLoadError(true));
   }, [id]);
 
+  useEffect(() => { load(); }, [load]);
+  usePolling(load, 30000);
+
   async function saveNotes() {
     setSaving(true);
     setError('');
     try {
       await client.patch(`/sessions/${id}/notes`, { notes });
+      showToast('Notes Saved');
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to save notes'));
     } finally {
@@ -40,6 +48,7 @@ export default function SessionDetail() {
     setError('');
     try {
       await client.patch(`/sessions/${id}/complete`, { notes });
+      showToast('Session Marked Complete');
       navigate(-1);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to mark session complete'));
@@ -48,13 +57,13 @@ export default function SessionDetail() {
     }
   }
 
-  if (loadError) return <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load this session. Please try again.</p></div>;
+  if (loadError) return <div className="empty-state"><div style={{ display: 'flex', justifyContent: 'center' }}><ExclamationTriangleIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div><p>Couldn't load this session. Please try again.</p></div>;
   if (!session) return <div className="loading">Loading…</div>;
 
   return (
     <div className="page">
       <button onClick={() => navigate(-1)} style={{ color: 'var(--primary)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, fontSize: 15 }}>
-        ← Back
+        <ArrowLeftIcon style={{ width: 18, height: 18 }} /> Back
       </button>
 
       <div style={{ marginBottom: 24 }}>
@@ -107,8 +116,8 @@ export default function SessionDetail() {
       )}
 
       {session.is_completed && (
-        <div style={{ background: '#d1fae5', borderRadius: 'var(--radius-sm)', padding: '12px 16px', textAlign: 'center', color: '#065f46', fontWeight: 600 }}>
-          ✓ Session completed
+        <div style={{ background: 'var(--success-light)', borderRadius: 'var(--radius-sm)', padding: '12px 16px', textAlign: 'center', color: '#0D6B2C', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <CheckCircleIcon style={{ width: 18, height: 18 }} /> Session Completed
         </div>
       )}
 

@@ -2,20 +2,21 @@ import { Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import PushNotificationsPrompt from './PushNotificationsPrompt';
 import NotificationBell from './NotificationBell';
+import { ArrowRightStartOnRectangleIcon } from '@heroicons/react/24/outline';
 
 export default function SequenceCreatorLayout() {
   const { logout } = useAuth();
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{
-        background: 'var(--primary)', color: '#fff', padding: '12px 16px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-      }}>
-        <span style={{ fontWeight: 700 }}>🧘 Oneness Yoga</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div className="app-header">
+        <div className="app-header-title">
+          <span>🧘</span>
+          <span>Oneness Yoga</span>
+        </div>
+        <div className="app-header-actions">
           <NotificationBell />
-          <button onClick={logout} style={{ color: '#fff', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer' }}>
-            Logout
+          <button onClick={logout} className="header-icon-btn" aria-label="Logout" title="Logout">
+            <ArrowRightStartOnRectangleIcon style={{ width: 20, height: 20 }} />
           </button>
         </div>
       </div>

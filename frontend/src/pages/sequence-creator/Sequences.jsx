@@ -1,10 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import client from '../../api/client';
 import { format, startOfWeek } from 'date-fns';
+import { ExclamationTriangleIcon, QueueListIcon, PlusIcon } from '@heroicons/react/24/outline';
 import Modal from '../../components/Modal';
 import { getApiErrorMessage } from '../../utils/apiError';
+import usePolling from '../../hooks/usePolling';
+import { useToast } from '../../context/ToastContext';
 
 export default function CreatorSequences() {
+  const { showToast } = useToast();
   const [sequences, setSequences] = useState([]);
   const [weeks, setWeeks] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState('');
@@ -22,12 +26,12 @@ export default function CreatorSequences() {
     return format(startOfWeek(new Date(dateStr), { weekStartsOn: 1 }), 'yyyy-MM-dd');
   }
 
-  function load() {
+  const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
     const q = selectedWeek ? `?week=${selectedWeek}` : '';
     client.get(`/sequences${q}`).then(r => setSequences(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
-  }
+  }, [selectedWeek]);
 
   useEffect(() => {
     Promise.all([client.get('/sequences/weeks'), client.get('/users/trainers')]).then(([w, t]) => {
@@ -38,7 +42,9 @@ export default function CreatorSequences() {
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
-  useEffect(() => { if (!selectedWeek) return; load(); }, [selectedWeek]);
+  useEffect(() => { if (!selectedWeek) return; load(); }, [selectedWeek, load]);
+
+  usePolling(load, 30000);
 
   async function submit(e) {
     e.preventDefault();
@@ -58,6 +64,7 @@ export default function CreatorSequences() {
       const w = week_start_date;
       if (!weeks.includes(w)) setWeeks([w, ...weeks]);
       setSelectedWeek(w);
+      showToast('Sequence Assigned Successfully');
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to save sequence'));
     } finally {
@@ -70,7 +77,8 @@ export default function CreatorSequences() {
     setNotice({ type: '', text: '' });
     try {
       await client.post('/sequences/notify-week', { week_start_date: selectedWeek });
-      setNotice({ type: 'success', text: 'Assigned trainers notified!' });
+      setNotice({ type: 'success', text: 'Assigned Trainers Notified!' });
+      showToast('Trainers Notified');
     } catch (err) {
       setNotice({ type: 'error', text: getApiErrorMessage(err, 'Failed to notify trainers') });
     } finally {
@@ -81,8 +89,9 @@ export default function CreatorSequences() {
   async function notifySingle(id) {
     try {
       await client.post(`/sequences/${id}/notify-trainer`);
-      setNotice({ type: 'success', text: 'Trainer notified!' });
+      setNotice({ type: 'success', text: 'Trainer Notified!' });
       setTimeout(() => setNotice({ type: '', text: '' }), 3000);
+      showToast('Trainer Notified');
     } catch (err) {
       setNotice({ type: 'error', text: getApiErrorMessage(err, 'Failed to notify trainer') });
     }
@@ -92,7 +101,9 @@ export default function CreatorSequences() {
     <div className="page">
       <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 className="page-title">Sequences</h1>
-        <button className="btn btn-primary" style={{ padding: '8px 16px' }} onClick={() => setShowForm(true)}>+ Assign</button>
+        <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowForm(true)}>
+          <PlusIcon style={{ width: 16, height: 16 }} /> Assign Sequence
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
@@ -111,7 +122,7 @@ export default function CreatorSequences() {
 
       {selectedWeek && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Week of {format(new Date(selectedWeek), 'd MMM yyyy')}</span>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Week Of {format(new Date(selectedWeek), 'd MMM yyyy')}</span>
           <button className="btn btn-primary" style={{ fontSize: 13, padding: '6px 14px' }} onClick={notifyWeek} disabled={notifying}>
             {notifying ? 'Notifying…' : 'Notify All Trainers'}
           </button>
@@ -132,13 +143,25 @@ export default function CreatorSequences() {
       )}
 
       {loading ? <div className="loading">Loading…</div> : loadError ? (
-        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load sequences. Please try again.</p></div>
+        <div className="empty-state">
+          <div className="empty-state-icon" style={{ display: 'flex', justifyContent: 'center' }}>
+            <ExclamationTriangleIcon style={{ width: 20, height: 20 }} />
+          </div>
+          <p>Couldn't Load Sequences. Please Try Again.</p>
+        </div>
       ) : sequences.length === 0 ? (
-        <div className="empty-state"><div className="empty-state-icon">⊡</div><p>No sequences assigned yet</p></div>
+        <div className="empty-state">
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <QueueListIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)', margin: '0 auto 12px' }} />
+          </div>
+          <p>No Sequences Assigned Yet</p>
+        </div>
       ) : sequences.map(seq => (
         <div key={seq.id} className="list-item">
           <div className="list-item-left">
-            <span style={{ fontSize: 11, fontWeight: 700, color: seq.status === 'uploaded' ? 'var(--success)' : 'var(--primary)', textTransform: 'uppercase' }}>{seq.status}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: seq.status === 'uploaded' ? 'var(--success)' : 'var(--primary)' }}>
+              {seq.status ? seq.status.charAt(0).toUpperCase() + seq.status.slice(1) : ''}
+            </span>
             <div className="list-item-title">{seq.topic}</div>
             <div className="list-item-sub">{format(new Date(seq.scheduled_date), 'EEE, d MMM')} · {seq.trainer_name}</div>
             {seq.google_sheet_link && (
@@ -165,12 +188,12 @@ export default function CreatorSequences() {
               <div className="form-group">
                 <label className="label" htmlFor="creator-seq-trainer">Assign To</label>
                 <select id="creator-seq-trainer" className="input" value={form.assigned_trainer_id} onChange={e => setForm(f => ({ ...f, assigned_trainer_id: e.target.value }))} required>
-                  <option value="">Select trainer…</option>
+                  <option value="">Select Trainer…</option>
                   {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label className="label" htmlFor="creator-seq-instructions">Instructions (optional)</label>
+                <label className="label" htmlFor="creator-seq-instructions">Instructions (Optional)</label>
                 <textarea id="creator-seq-instructions" className="input" rows={3} value={form.instructions} onChange={e => setForm(f => ({ ...f, instructions: e.target.value }))} placeholder="Any notes for the trainer…" />
               </div>
               {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}

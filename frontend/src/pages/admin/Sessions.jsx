@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import client from '../../api/client';
 import { format } from 'date-fns';
 import { groupByDate } from '../../utils/date';
 import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { ExclamationTriangleIcon, CalendarDaysIcon, PlusIcon } from '@heroicons/react/24/outline';
+import usePolling from '../../hooks/usePolling';
+import { useToast } from '../../context/ToastContext';
 
 const EMPTY_SESSION = { title: 'Daily Session', scheduled_date: '', scheduled_time: '06:15', session_type: 'BKP', assigned_trainer_id: '', zoom_link: '' };
 
@@ -19,8 +22,10 @@ export default function AdminSessions() {
   const [error, setError] = useState('');
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
   const [deleteId, setDeleteId] = useState(null);
+  
+  const { showToast } = useToast();
 
-  function load() {
+  const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
     Promise.all([
@@ -30,9 +35,11 @@ export default function AdminSessions() {
       setSessions(s.data);
       setTrainers(t.data);
     }).catch(() => setLoadError(true)).finally(() => setLoading(false));
-  }
+  }, [dateFrom]);
 
-  useEffect(() => { load(); }, [dateFrom]);
+  useEffect(() => { load(); }, [load]);
+  
+  usePolling(load, 30000);
 
   async function submit(e) {
     e.preventDefault();
@@ -49,6 +56,7 @@ export default function AdminSessions() {
       await client.post('/sessions', payload);
       setShowForm(false);
       setForm(EMPTY_SESSION);
+      showToast('Session Saved Successfully');
       load();
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to save session'));
@@ -62,6 +70,7 @@ export default function AdminSessions() {
     setError('');
     try {
       await client.delete(`/sessions/${id}`);
+      showToast('Session Deleted');
       load();
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to delete session'));
@@ -74,20 +83,20 @@ export default function AdminSessions() {
     <div className="page">
       <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 className="page-title">Sessions</h1>
-        <button className="btn btn-primary" style={{ padding: '8px 16px' }} onClick={() => setShowForm(true)}>+ Add</button>
+        <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowForm(true)}><PlusIcon style={{ width: 16, height: 16 }} /> Add Session</button>
       </div>
 
       <div className="form-group">
-        <label className="label" htmlFor="sessions-from-date">From date</label>
+        <label className="label" htmlFor="sessions-from-date">From Date</label>
         <input id="sessions-from-date" className="input" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
       </div>
 
       {error && !showForm && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
 
       {loading ? <div className="loading">Loading…</div> : loadError ? (
-        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load sessions. Please try again.</p></div>
+        <div className="empty-state"><div className="empty-state-icon"><ExclamationTriangleIcon style={{ width: 20, height: 20 }} /></div><p>Couldn't load sessions. Please try again.</p></div>
       ) : Object.keys(grouped).length === 0 ? (
-        <div className="empty-state"><div className="empty-state-icon">📅</div><p>No sessions found</p></div>
+        <div className="empty-state"><div style={{ display: 'flex', justifyContent: 'center', margin: '0 auto 12px' }}><CalendarDaysIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div><p>No sessions found</p></div>
       ) : Object.entries(grouped).map(([date, items]) => (
         <div key={date}>
           <p className="section-title">{format(new Date(date), 'EEEE, d MMMM yyyy')}</p>

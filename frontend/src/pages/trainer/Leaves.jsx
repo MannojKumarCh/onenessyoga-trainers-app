@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import client from '../../api/client';
 import Modal from '../../components/Modal';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { ExclamationTriangleIcon, DocumentTextIcon, PlusIcon } from '@heroicons/react/24/outline';
+import usePolling from '../../hooks/usePolling';
+import { useToast } from '../../context/ToastContext';
 
 export default function Leaves() {
   const [leaves, setLeaves] = useState([]);
@@ -12,11 +15,14 @@ export default function Leaves() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  function load() {
-    client.get('/leaves/my').then(r => setLeaves(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
-  }
+  const { showToast } = useToast();
 
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => {
+    client.get('/leaves/my').then(r => setLeaves(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+  usePolling(load, 30000);
 
   async function submit(e) {
     e.preventDefault();
@@ -26,6 +32,7 @@ export default function Leaves() {
       await client.post('/leaves', form);
       setShowForm(false);
       setForm({ from_date: '', to_date: '', reason: '' });
+      showToast('Leave Application Submitted');
       load();
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to apply'));
@@ -38,6 +45,7 @@ export default function Leaves() {
     setError('');
     try {
       await client.delete(`/leaves/${id}`);
+      showToast('Leave Cancelled');
       load();
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to cancel leave'));
@@ -50,16 +58,18 @@ export default function Leaves() {
     <div className="page">
       <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 className="page-title">Leaves</h1>
-        <button className="btn btn-primary" style={{ padding: '8px 16px' }} onClick={() => setShowForm(true)}>+ Apply</button>
+        <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowForm(true)}>
+          <PlusIcon style={{ width: 16, height: 16 }} /> Apply Leave
+        </button>
       </div>
 
       {error && !showForm && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
 
       {loadError ? (
-        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load leaves. Please try again.</p></div>
+        <div className="empty-state"><div style={{ display: 'flex', justifyContent: 'center' }}><ExclamationTriangleIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div><p>Couldn't load leaves. Please try again.</p></div>
       ) : leaves.length === 0 ? (
         <div className="empty-state">
-          <div className="empty-state-icon">📝</div>
+          <div style={{ display: 'flex', justifyContent: 'center' }}><DocumentTextIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div>
           <p>No leave applications yet</p>
         </div>
       ) : leaves.map(l => (
@@ -70,7 +80,7 @@ export default function Leaves() {
             {l.admin_note && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>Note: {l.admin_note}</div>}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-            <span className={`badge badge-${l.status}`}>{l.status}</span>
+            <span className={`badge badge-${l.status}`}>{l.status.charAt(0).toUpperCase() + l.status.slice(1)}</span>
             {l.status === 'pending' && (
               <button onClick={() => cancel(l.id)} style={{ fontSize: 12, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>
                 Cancel
@@ -81,7 +91,7 @@ export default function Leaves() {
       ))}
 
       {showForm && (
-        <Modal title="Apply for Leave" onClose={() => setShowForm(false)}>
+        <Modal title="Apply For Leave" onClose={() => setShowForm(false)}>
             <form onSubmit={submit}>
               <div className="form-group">
                 <label className="label" htmlFor="leave-from-date">From Date <span style={{ color: 'var(--danger)' }}>*</span></label>

@@ -29,12 +29,13 @@ router.post('/login', loginLimiter, async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
   const user = await prisma.user.findFirst({
-    where: { email: email.toLowerCase().trim(), is_active: true }
+    where: { email: email.toLowerCase().trim() }
   });
-  if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+  if (!user) return res.status(401).json({ error: 'No account found with this email address' });
+  if (!user.is_active) return res.status(403).json({ error: 'Your account has been deactivated. Please contact an admin' });
 
   const valid = await bcrypt.compare(password, user.password_hash);
-  if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+  if (!valid) return res.status(401).json({ error: 'Incorrect password. Please check and try again' });
 
   const token = jwt.sign(
     { id: user.id, name: user.name, email: user.email, role: user.role },

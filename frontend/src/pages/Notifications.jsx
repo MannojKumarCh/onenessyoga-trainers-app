@@ -1,21 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { ExclamationTriangleIcon, BellIcon } from '@heroicons/react/24/outline';
 import client from '../api/client';
+import usePolling from '../hooks/usePolling';
+import { useToast } from '../context/ToastContext';
 
 export default function Notifications() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
-  function load() {
+  const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
     client.get('/notifications/history').then(r => setNotifications(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
-  }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
+  usePolling(load, 30000);
 
   async function handleClick(item) {
     if (!item.is_read) {
@@ -27,6 +32,7 @@ export default function Notifications() {
 
   async function markAllRead() {
     await client.patch('/notifications/read-all').catch(() => {});
+    showToast('All Notifications Marked as Read');
     load();
   }
 
@@ -34,13 +40,23 @@ export default function Notifications() {
     <div className="page">
       <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 className="page-title">Notifications</h1>
-        <button className="btn btn-ghost" style={{ fontSize: 13, padding: '4px 8px' }} onClick={markAllRead}>Mark all read</button>
+        <button className="btn btn-ghost" style={{ fontSize: 13, padding: '4px 8px' }} onClick={markAllRead}>Mark All Read</button>
       </div>
 
       {loading ? <div className="loading">Loading…</div> : loadError ? (
-        <div className="empty-state"><div className="empty-state-icon">⚠️</div><p>Couldn't load notifications. Please try again.</p></div>
+        <div className="empty-state">
+          <div className="empty-state-icon" style={{ display: 'flex', justifyContent: 'center' }}>
+            <ExclamationTriangleIcon style={{ width: 20, height: 20 }} />
+          </div>
+          <p>Couldn't load notifications. Please try again.</p>
+        </div>
       ) : notifications.length === 0 ? (
-        <div className="empty-state"><div className="empty-state-icon">🔔</div><p>No notifications yet</p></div>
+        <div className="empty-state">
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <BellIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)', margin: '0 auto 12px' }} />
+          </div>
+          <p>No notifications yet</p>
+        </div>
       ) : notifications.map(item => (
         <button
           key={item.id}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 export default function PasswordInput({ id, value, onChange, ...rest }) {
   const [show, setShow] = useState(false);
@@ -20,11 +21,11 @@ export default function PasswordInput({ id, value, onChange, ...rest }) {
         aria-pressed={show}
         style={{
           position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
-          background: 'none', border: 'none', cursor: 'pointer', fontSize: 18,
-          padding: 8, lineHeight: 1, color: 'var(--text-secondary)'
+          background: 'none', border: 'none', cursor: 'pointer',
+          padding: 8, lineHeight: 1, color: 'var(--text-secondary)', display: 'flex'
         }}
       >
-        {show ? '🙈' : '👁️'}
+        {show ? <EyeSlashIcon style={{ width: 18, height: 18 }} /> : <EyeIcon style={{ width: 18, height: 18 }} />}
       </button>
     </div>
   );
