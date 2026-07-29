@@ -80,7 +80,7 @@ router.get('/weeks', authenticate, async (req, res) => {
 router.get('/:id', authenticate, async (req, res) => {
   const seq = await prisma.sequence.findUnique({
     where: { id: parseInt(req.params.id) },
-    include: withNames
+    include: { ...withNames, items: { orderBy: { sort_order: 'asc' } } }
   });
   if (!seq) return res.status(404).json({ error: 'Not found' });
   res.json(serialize(seq));

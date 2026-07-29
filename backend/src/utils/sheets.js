@@ -83,16 +83,23 @@ async function findOrCreateMonthlySheet(year_month, scheduled_date) {
     select: { email: true }
   });
 
-  const emailsToShare = [OWNER_EMAIL, ...approvedTrainers.map(t => t.email)];
-  await Promise.allSettled(
-    emailsToShare.map(email =>
+  // Only the studio owner account can edit the master sheet; trainers get read-only
+  // access so they can reference it, but the app (not manual sheet edits) stays the
+  // single source of truth.
+  await Promise.allSettled([
+    sheetsClient.drive.permissions.create({
+      fileId: spreadsheetId,
+      sendNotificationEmail: false,
+      requestBody: { role: 'writer', type: 'user', emailAddress: OWNER_EMAIL }
+    }),
+    ...approvedTrainers.map(t =>
       sheetsClient.drive.permissions.create({
         fileId: spreadsheetId,
         sendNotificationEmail: false,
-        requestBody: { role: 'writer', type: 'user', emailAddress: email }
+        requestBody: { role: 'reader', type: 'user', emailAddress: t.email }
       })
     )
-  );
+  ]);
 
   monthlySheet = await prisma.monthlySheet.create({
     data: { year_month, spreadsheet_id: spreadsheetId }
@@ -162,24 +169,42 @@ async function findOrCreateDayTab(spreadsheetId, scheduled_date) {
   return newSheetId;
 }
 
-async function appendTrainerSection(spreadsheetId, tabTitle, sequence, items) {
-  const range = `'${tabTitle}'!A:C`;
-  const existing = await sheetsClient.sheets.spreadsheets.values.get({ spreadsheetId, range });
-  const rowCount = (existing.data.values || []).length;
-  const startRow = rowCount + 1; // 1-indexed, one blank row spacer
-
-  const trainerName = sequence.assigned_trainer?.name || '';
-  const subHeader = [`${trainerName} - ${sequence.topic}`, '', ''];
-  const itemRows = items.map(it => [it.name, it.remarks || '', it.reference_url || '']);
-
-  await sheetsClient.sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range: `'${tabTitle}'!A${startRow}`,
-    valueInputOption: 'USER_ENTERED',
-    requestBody: {
-      values: [subHeader, ...itemRows]
-    }
+// Rebuilds the day tab's body (everything below the title + column-header rows) from scratch,
+// reading the current state of every sequence scheduled that day from the DB. This is
+// idempotent — re-running it after an edit never leaves stale/duplicate sections behind,
+// and naturally handles multiple trainers' sequences stacking within the same day's tab.
+async function rewriteDayTabContent(spreadsheetId, tabTitle, scheduled_date) {
+  const sequences = await prisma.sequence.findMany({
+    where: { scheduled_date },
+    include: { assigned_trainer: { select: { name: true } }, items: { orderBy: { sort_order: 'asc' } } },
+    orderBy: { id: 'asc' }
   });
+
+  const rows = [];
+  for (const seq of sequences) {
+    if (!seq.items || seq.items.length === 0) continue;
+    const trainerName = seq.assigned_trainer?.name || '';
+    rows.push([`${trainerName} - ${seq.topic}`, '', '']);
+    for (const it of seq.items) {
+      rows.push([it.name, it.remarks || '', it.reference_url || '']);
+    }
+    rows.push(['', '', '']); // spacer between trainer sections
+  }
+  if (rows.length > 0) rows.pop(); // drop trailing spacer
+
+  await sheetsClient.sheets.spreadsheets.values.clear({
+    spreadsheetId,
+    range: `'${tabTitle}'!A3:C10000`
+  });
+
+  if (rows.length > 0) {
+    await sheetsClient.sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'${tabTitle}'!A3`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: rows }
+    });
+  }
 }
 
 async function upsertSequenceInSheet(sequence, items) {
@@ -195,7 +220,7 @@ async function upsertSequenceInSheet(sequence, items) {
     const tabSheetId = await findOrCreateDayTab(spreadsheetId, sequence.scheduled_date);
     const tabTitle = dayTabTitleOf(sequence.scheduled_date);
 
-    await appendTrainerSection(spreadsheetId, tabTitle, sequence, items);
+    await rewriteDayTabContent(spreadsheetId, tabTitle, sequence.scheduled_date);
 
     return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${tabSheetId}`;
   } catch (err) {
@@ -211,10 +236,11 @@ async function shareSpreadsheetWithTrainer(spreadsheetId, email) {
   }
 
   try {
+    // Read-only — only the studio owner account (OWNER_EMAIL) gets edit access.
     await sheetsClient.drive.permissions.create({
       fileId: spreadsheetId,
       sendNotificationEmail: false,
-      requestBody: { role: 'writer', type: 'user', emailAddress: email }
+      requestBody: { role: 'reader', type: 'user', emailAddress: email }
     });
     return true;
   } catch (err) {
