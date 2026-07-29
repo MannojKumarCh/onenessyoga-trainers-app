@@ -7,9 +7,13 @@ import { dayLabel } from '../../utils/date';
 import { ExclamationTriangleIcon, SparklesIcon, CalendarDaysIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
 
+import { usePush } from '../../hooks/usePush';
+import { BellAlertIcon } from '@heroicons/react/24/outline';
+
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { supported, permission, isEnabling, enablePushNotifications } = usePush(user);
   const [sessions, setSessions] = useState([]);
   const [pendingLeaves, setPendingLeaves] = useState([]);
   const [sequences, setSequences] = useState([]);
@@ -54,10 +58,10 @@ export default function Dashboard() {
         border: '1px solid var(--border-light)',
         borderRadius: 'var(--radius)',
         padding: '20px 24px',
-        marginBottom: 24,
+        marginBottom: 20,
         display: 'flex',
         alignItems: 'center',
-        justify: 'space-between',
+        justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: 12
       }}>
@@ -89,6 +93,54 @@ export default function Dashboard() {
           {format(new Date(), 'EEEE, d MMMM yyyy')}
         </div>
       </div>
+
+      {/* Prominent Enable Push Notifications Banner (If not yet granted) */}
+      {supported && permission !== 'granted' && (
+        <div style={{
+          background: 'linear-gradient(135deg, #FEF0EE 0%, #FFF7ED 100%)',
+          border: '1.5px solid var(--primary)',
+          borderRadius: 'var(--radius)',
+          padding: '16px 20px',
+          marginBottom: 24,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12,
+          boxShadow: 'var(--shadow-md)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            <div className="stat-icon-box" style={{
+              width: 42,
+              height: 42,
+              borderRadius: 12,
+              background: 'var(--primary)',
+              color: '#fff',
+              flexShrink: 0
+            }}>
+              <BellAlertIcon style={{ width: 22, height: 22 }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                Enable Mobile Push Notifications
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
+                Get instant alerts on your phone for new sessions, sequences, and leave updates.
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => enablePushNotifications().catch(() => {})}
+            disabled={isEnabling}
+            style={{ fontSize: 13, padding: '8px 18px', minHeight: 38 }}
+          >
+            {isEnabling ? 'Enabling…' : 'Enable Notifications'}
+          </button>
+        </div>
+      )}
 
       {/* Upcoming sessions */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>

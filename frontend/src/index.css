@@ -368,3 +368,15 @@ a:focus-visible, button:focus-visible, .list-item:focus-visible {
 .text-capitalize { text-transform: capitalize; }
 .animate-slide-up { animation: slideUp 0.35s ease-out; }
 .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+
+/* ─── Icon Centering Reset ─── */
+.stat-icon-box {
+  display: grid !important;
+  place-items: center !important;
+  box-sizing: border-box !important;
+}
+.stat-icon-box svg {
+  display: block !important;
+  margin: auto !important;
+  flex-shrink: 0 !important;
+}

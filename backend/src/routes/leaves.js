@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
-const { notifyUser } = require('../utils/notify');
+const { notifyUser, notifyUsers } = require('../utils/notify');
 const asyncHandler = require('../utils/asyncHandler');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
@@ -43,6 +43,15 @@ router.post('/', authenticate, requireRole('trainer'), async (req, res) => {
   const leave = await prisma.leave.create({
     data: { trainer_id: req.user.id, from_date, to_date, reason: reason.trim() }
   });
+
+  const admins = await prisma.user.findMany({ where: { role: 'super_admin', is_active: true }, select: { id: true } });
+  if (admins.length > 0) {
+    notifyUsers(admins.map(a => a.id), {
+      title: 'New Leave Application',
+      body: `${req.user.name} applied for leave (${from_date} to ${to_date}): "${reason.trim()}"`,
+      url: '/leaves'
+    }).catch(() => {});
+  }
 
   res.status(201).json({ id: leave.id });
 });

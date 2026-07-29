@@ -10,6 +10,7 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const refreshCount = useCallback(() => {
@@ -39,9 +40,12 @@ export default function NotificationBell() {
   function toggleOpen() {
     if (!open) {
       setError('');
+      setLoading(true);
+      setItems([]); // Clear stale items immediately
       client.get('/notifications/unread')
         .then(r => setItems(r.data))
-        .catch(err => setError(getApiErrorMessage(err, 'Could not load notifications')));
+        .catch(err => setError(getApiErrorMessage(err, 'Could not load notifications')))
+        .finally(() => setLoading(false));
     }
     setOpen(o => !o);
   }
@@ -50,7 +54,12 @@ export default function NotificationBell() {
     setItems(list => list.filter(n => n.id !== item.id));
     setUnreadCount(c => Math.max(0, c - 1));
     setOpen(false);
-    client.patch(`/notifications/${item.id}/read`).catch(() => {});
+    try {
+      await client.patch(`/notifications/${item.id}/read`);
+    } catch {
+      // If marking as read fails, refresh the count to resync
+      refreshCount();
+    }
     if (item.url) navigate(item.url);
   }
 
@@ -104,7 +113,13 @@ export default function NotificationBell() {
 
             {error && <p className="error-text" style={{ fontSize: 13 }}>{error}</p>}
 
-            {!error && items.length === 0 && (
+            {loading && !error && (
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>
+                Loading…
+              </p>
+            )}
+
+            {!loading && !error && items.length === 0 && (
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', padding: '20px 0' }}>
                 No New Notifications
               </p>

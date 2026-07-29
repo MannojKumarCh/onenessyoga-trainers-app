@@ -11,12 +11,24 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('push', event => {
-  const payload = event.data ? event.data.json() : {};
+  let payload;
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (e) {
+    // If the payload is not valid JSON, use a safe fallback
+    payload = {
+      title: 'Oneness Yoga',
+      body: event.data ? event.data.text() : 'You have a new notification.'
+    };
+  }
+
   const title = payload.title || 'Oneness Yoga';
   const options = {
     body: payload.body || 'You have a new notification.',
-    icon: payload.icon || (self.location.origin + '/logo192.png'),
-    badge: payload.badge || (self.location.origin + '/logo192.png'),
+    // Use manifest icon; omit icon/badge if no custom one provided
+    // (browser will fall back to app icon from manifest automatically)
+    icon: payload.icon || undefined,
+    badge: payload.badge || undefined,
     vibrate: [100, 50, 100],
     data: {
       url: payload.url || '/',

@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { format } from 'date-fns';
 import usePolling from '../../hooks/usePolling';
+import { useToast } from '../../context/ToastContext';
+import { usePush } from '../../hooks/usePush';
+import { useAuth } from '../../context/AuthContext';
 import {
   ExclamationTriangleIcon,
   UsersIcon,
@@ -10,16 +13,22 @@ import {
   DocumentTextIcon,
   SparklesIcon,
   ClockIcon,
-  VideoCameraIcon
+  VideoCameraIcon,
+  BellAlertIcon
 } from '@heroicons/react/24/outline';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const { supported, permission, isEnabling, error: pushError, enablePushNotifications } = usePush(user);
+
   const [stats, setStats] = useState(null);
   const [todaySessionsList, setTodaySessionsList] = useState([]);
   const [pendingLeavesList, setPendingLeavesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [sendingTestPush, setSendingTestPush] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -46,6 +55,18 @@ export default function AdminDashboard() {
   }, [load]);
 
   usePolling(load, 30000);
+
+  async function sendTestPush() {
+    setSendingTestPush(true);
+    try {
+      await client.post('/notifications/test-push');
+      showToast('Test push notification sent! Check your phone.');
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Could not send test push', 'error');
+    } finally {
+      setSendingTestPush(false);
+    }
+  }
 
   if (loading) return <div className="loading">Loading…</div>;
 
@@ -99,7 +120,7 @@ export default function AdminDashboard() {
         border: '1px solid var(--border-light)',
         borderRadius: 'var(--radius)',
         padding: '20px 24px',
-        marginBottom: 24,
+        marginBottom: 20,
         display: 'flex',
         alignItems: 'center',
         justify: 'space-between',
@@ -121,20 +142,80 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        <div style={{
-          background: 'var(--bg-elevated)',
-          border: '1px solid var(--border)',
-          borderRadius: 999,
-          padding: '6px 14px',
-          fontSize: 13,
-          fontWeight: 600,
-          color: 'var(--text-secondary)',
-          boxShadow: 'var(--shadow-sm)',
-          whiteSpace: 'nowrap'
-        }}>
-          {format(new Date(), 'EEEE, d MMMM yyyy')}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-outline"
+            style={{ fontSize: 13, padding: '6px 14px', minHeight: 34, background: 'var(--bg-elevated)' }}
+            onClick={sendTestPush}
+            disabled={sendingTestPush}
+          >
+            <BellAlertIcon style={{ width: 16, height: 16 }} />
+            {sendingTestPush ? 'Sending…' : 'Test Push Notification'}
+          </button>
+
+          <div style={{
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border)',
+            borderRadius: 999,
+            padding: '6px 14px',
+            fontSize: 13,
+            fontWeight: 600,
+            color: 'var(--text-secondary)',
+            boxShadow: 'var(--shadow-sm)',
+            whiteSpace: 'nowrap'
+          }}>
+            {format(new Date(), 'EEEE, d MMMM yyyy')}
+          </div>
         </div>
       </div>
+
+      {/* Prominent Enable Push Notifications Banner (If not yet granted) */}
+      {supported && permission !== 'granted' && (
+        <div style={{
+          background: 'linear-gradient(135deg, #FEF0EE 0%, #FFF7ED 100%)',
+          border: '1.5px solid var(--primary)',
+          borderRadius: 'var(--radius)',
+          padding: '16px 20px',
+          marginBottom: 24,
+          display: 'flex',
+          alignItems: 'center',
+          justify: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12,
+          boxShadow: 'var(--shadow-md)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            <div className="stat-icon-box" style={{
+              width: 42,
+              height: 42,
+              borderRadius: 12,
+              background: 'var(--primary)',
+              color: '#fff',
+              flexShrink: 0
+            }}>
+              <BellAlertIcon style={{ width: 22, height: 22 }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                Enable Mobile Push Notifications
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
+                Receive instant alerts on your phone whenever trainers request leave or complete sessions.
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => enablePushNotifications().catch(() => {})}
+            disabled={isEnabling}
+            style={{ fontSize: 13, padding: '8px 18px', minHeight: 38 }}
+          >
+            {isEnabling ? 'Enabling…' : 'Enable Notifications'}
+          </button>
+        </div>
+      )}
 
       {/* Metrics Stat Grid */}
       <div style={{
@@ -195,20 +276,20 @@ export default function AdminDashboard() {
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', lineHeight: 1.3 }}>
                 {c.label}
               </span>
-              <div style={{
-                width: 36,
-                height: 36,
-                minWidth: 36,
-                minHeight: 36,
-                borderRadius: 10,
-                background: c.bgColor,
-                display: 'flex',
-                alignItems: 'center',
-                justify: 'center',
-                color: c.accentColor,
-                flexShrink: 0
-              }}>
-                <c.Icon style={{ width: 20, height: 20, flexShrink: 0 }} />
+              <div
+                className="stat-icon-box"
+                style={{
+                  width: 36,
+                  height: 36,
+                  minWidth: 36,
+                  minHeight: 36,
+                  borderRadius: 10,
+                  background: c.bgColor,
+                  color: c.accentColor,
+                  flexShrink: 0
+                }}
+              >
+                <c.Icon style={{ width: 20, height: 20 }} />
               </div>
             </div>
 

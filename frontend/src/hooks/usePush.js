@@ -2,10 +2,25 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import client from '../api/client';
 
 function urlBase64ToUint8Array(base64String) {
+  if (!base64String || typeof base64String !== 'string') {
+    throw new Error('Invalid VAPID public key received from server.');
+  }
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+/** Compare two ArrayBuffer/Uint8Array for equality */
+function arrayBufferEqual(a, b) {
+  if (!a || !b) return false;
+  const viewA = new Uint8Array(a);
+  const viewB = new Uint8Array(b);
+  if (viewA.length !== viewB.length) return false;
+  for (let i = 0; i < viewA.length; i++) {
+    if (viewA[i] !== viewB[i]) return false;
+  }
+  return true;
 }
 
 export function usePush(user) {
@@ -33,35 +48,62 @@ export function usePush(user) {
       return false;
     }
 
-    const { data } = await client.get('/notifications/vapid-public-key');
-    if (!data?.key) {
+    // Fetch VAPID public key with a 10-second timeout
+    let vapidKey;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const { data } = await client.get('/notifications/vapid-public-key', {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      vapidKey = data?.key;
+    } catch (err) {
+      if (err.name === 'AbortError' || err.name === 'CanceledError') {
+        throw new Error('Timed out fetching push configuration. Please try again.');
+      }
+      throw err;
+    }
+
+    if (!vapidKey) {
       throw new Error('Push notifications are not configured on this server.');
     }
 
+    const applicationServerKey = urlBase64ToUint8Array(vapidKey);
+
     // Register the root-scoped service worker (served from /sw.js).
-    // This avoids the Vite dev /src/ scope limitation and is required for push
-    // to behave consistently across local dev and production.
     let reg = await navigator.serviceWorker.getRegistration();
     if (!reg) {
       reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
     }
 
-    // Always wait for the registration to actually be active before subscribing —
-    // a freshly-registered/installing worker isn't ready yet and pushManager.subscribe()
-    // throws AbortError against it.
+    // Wait for the registration to be active before subscribing
     const currentReg = await navigator.serviceWorker.ready;
     if (!currentReg) {
       throw new Error('Could not register a service worker for push notifications.');
     }
 
     let sub = await currentReg.pushManager.getSubscription();
+
+    // If an existing subscription exists, verify its VAPID key matches the server's current key.
+    // If keys don't match (server regenerated VAPID keys), unsubscribe and re-subscribe.
+    if (sub) {
+      const existingKey = sub.options?.applicationServerKey;
+      if (!arrayBufferEqual(existingKey, applicationServerKey.buffer)) {
+        console.warn('[push] VAPID key mismatch — unsubscribing stale subscription and re-subscribing.');
+        await sub.unsubscribe();
+        sub = null;
+      }
+    }
+
     if (!sub) {
       sub = await currentReg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(data.key)
+        applicationServerKey
       });
     }
 
+    // Send subscription to backend (upsert — handles user_id transfer on device sharing)
     await client.post('/notifications/subscribe', { subscription: sub.toJSON() });
     syncPermission();
     return true;

@@ -82,8 +82,24 @@ export default function Leaves() {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
             <span className={`badge badge-${l.status}`}>{l.status.charAt(0).toUpperCase() + l.status.slice(1)}</span>
             {l.status === 'pending' && (
-              <button onClick={() => cancel(l.id)} style={{ fontSize: 12, color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                Cancel
+              <button
+                onClick={() => cancel(l.id)}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--danger)',
+                  background: 'transparent',
+                  border: '1px solid var(--danger)',
+                  borderRadius: 14,
+                  padding: '4px 12px',
+                  cursor: 'pointer',
+                  marginTop: 2,
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                Cancel Leave
               </button>
             )}
           </div>

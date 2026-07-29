@@ -205,6 +205,15 @@ router.patch('/:id/complete', authenticate, requireRole('trainer'), async (req, 
     data: { is_completed: true, completed_at: new Date(), notes: notes ?? session.notes }
   });
 
+  const admins = await prisma.user.findMany({ where: { role: 'super_admin', is_active: true }, select: { id: true } });
+  if (admins.length > 0) {
+    notifyUsers(admins.map(a => a.id), {
+      title: 'Session Completed',
+      body: `${req.user.name} marked session "${session.title}" as completed`,
+      url: '/sessions'
+    }).catch(() => {});
+  }
+
   res.json({ success: true });
 });
 
@@ -217,6 +226,16 @@ router.patch('/:id/notes', authenticate, requireRole('trainer'), async (req, res
   if (session.assigned_trainer_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
   await prisma.session.update({ where: { id }, data: { notes } });
+
+  const admins = await prisma.user.findMany({ where: { role: 'super_admin', is_active: true }, select: { id: true } });
+  if (admins.length > 0) {
+    notifyUsers(admins.map(a => a.id), {
+      title: 'Session Notes Added',
+      body: `${req.user.name} added notes to "${session.title}"`,
+      url: '/sessions'
+    }).catch(() => {});
+  }
+
   res.json({ success: true });
 });
 
