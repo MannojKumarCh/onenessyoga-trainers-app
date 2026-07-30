@@ -5,6 +5,7 @@ import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, QueueListIcon, PlusIcon } from '@heroicons/react/24/outline';
+import TopicSelect from '../../components/TopicSelect';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 
@@ -168,7 +169,7 @@ export default function AdminSequences() {
               </div>
               <div className="form-group">
                 <label className="label" htmlFor="admin-seq-topic">Topic</label>
-                <input id="admin-seq-topic" className="input" value={form.topic} placeholder="e.g. Surya Namaskar + Yoga" onChange={e => setForm(f => ({ ...f, topic: e.target.value }))} required />
+                <TopicSelect id="admin-seq-topic" value={form.topic} onChange={val => setForm(f => ({ ...f, topic: val }))} required />
               </div>
               <div className="form-group">
                 <label className="label" htmlFor="admin-seq-trainer">Assign Trainer</label>

@@ -5,6 +5,7 @@ node_modules/
 
 # Google Cloud service account keys - never commit
 Google Key/
+google key/
 *.json.key
 dist/
 build/

@@ -28,7 +28,7 @@ export default function AdminDashboard() {
   const [pendingLeavesList, setPendingLeavesList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [sendingTestPush, setSendingTestPush] = useState(false);
+
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -56,17 +56,7 @@ export default function AdminDashboard() {
 
   usePolling(load, 30000);
 
-  async function sendTestPush() {
-    setSendingTestPush(true);
-    try {
-      await client.post('/notifications/test-push');
-      showToast('Test push notification sent! Check your phone.');
-    } catch (err) {
-      showToast(err.response?.data?.error || 'Could not send test push', 'error');
-    } finally {
-      setSendingTestPush(false);
-    }
-  }
+
 
   if (loading) return <div className="loading">Loading…</div>;
 
@@ -143,15 +133,6 @@ export default function AdminDashboard() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <button
-            className="btn btn-outline"
-            style={{ fontSize: 13, padding: '6px 14px', minHeight: 34, background: 'var(--bg-elevated)' }}
-            onClick={sendTestPush}
-            disabled={sendingTestPush}
-          >
-            <BellAlertIcon style={{ width: 16, height: 16 }} />
-            {sendingTestPush ? 'Sending…' : 'Test Push Notification'}
-          </button>
 
           <div style={{
             background: 'var(--bg-elevated)',
