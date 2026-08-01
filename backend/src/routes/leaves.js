@@ -3,11 +3,14 @@ const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { notifyUser, notifyUsers } = require('../utils/notify');
 const asyncHandler = require('../utils/asyncHandler');
+const validateIdParam = require('../middleware/validateIdParam');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
   const original = router[method].bind(router);
   router[method] = (path, ...handlers) => original(path, ...handlers.map(handler => asyncHandler(handler)));
 });
+
+router.param('id', validateIdParam);
 
 // Trainer: my leaves
 router.get('/my', authenticate, requireRole('trainer'), async (req, res) => {

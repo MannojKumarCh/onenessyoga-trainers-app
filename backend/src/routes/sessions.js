@@ -3,11 +3,14 @@ const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const { notifyUser } = require('../utils/notify');
+const validateIdParam = require('../middleware/validateIdParam');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
   const original = router[method].bind(router);
   router[method] = (path, ...handlers) => original(path, ...handlers.map(handler => asyncHandler(handler)));
 });
+
+router.param('id', validateIdParam);
 
 function httpError(status, message) {
   const err = new Error(message);
@@ -142,15 +145,26 @@ router.post('/bulk', authenticate, requireRole('super_admin'), async (req, res) 
   const { sessions } = req.body;
   if (!Array.isArray(sessions) || sessions.length === 0) return res.status(400).json({ error: 'sessions array required' });
 
-  const data = await Promise.all(sessions.map(async s => ({
+  const trainerIds = sessions.map(s => parseOptionalPositiveInt(s.assigned_trainer_id, 'assigned_trainer_id'));
+  const uniqueTrainerIds = [...new Set(trainerIds.filter(id => id !== null))];
+
+  const trainers = await prisma.user.findMany({
+    where: { id: { in: uniqueTrainerIds }, role: 'trainer' },
+    select: { id: true }
+  });
+  if (trainers.length !== uniqueTrainerIds.length) {
+    throw httpError(400, 'assigned_trainer_id must reference an existing trainer');
+  }
+
+  const data = sessions.map((s, i) => ({
     title: s.title || 'Daily Session',
     scheduled_date: s.scheduled_date,
     scheduled_time: s.scheduled_time,
     session_type: s.session_type || 'BKP',
-    assigned_trainer_id: await ensureTrainerExists(parseOptionalPositiveInt(s.assigned_trainer_id, 'assigned_trainer_id')),
+    assigned_trainer_id: trainerIds[i],
     zoom_link: s.zoom_link || null,
     created_by: req.user.id
-  })));
+  }));
 
   await prisma.session.createMany({
     data

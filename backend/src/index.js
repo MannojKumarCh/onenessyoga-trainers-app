@@ -12,6 +12,20 @@ if (!FRONTEND_URL && process.env.NODE_ENV === 'production') {
   throw new Error('FRONTEND_URL must be set in production');
 }
 
+const REQUIRED_ENV_VARS = ['DATABASE_URL', 'JWT_SECRET', 'JWT_EXPIRES_IN'];
+const missingEnvVars = REQUIRED_ENV_VARS.filter(name => !process.env[name]);
+if (missingEnvVars.length > 0) {
+  console.error(`Missing required environment variable(s): ${missingEnvVars.join(', ')}`);
+  process.exit(1);
+}
+
+const OPTIONAL_ENV_VARS = ['RESEND_API_KEY', 'GOOGLE_SERVICE_ACCOUNT_KEY', 'GOOGLE_CLIENT_ID', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_EMAIL'];
+for (const name of OPTIONAL_ENV_VARS) {
+  if (!process.env[name]) {
+    console.warn(`Optional environment variable ${name} not set — related features will be disabled.`);
+  }
+}
+
 app.use(helmet());
 app.use(cors({ origin: FRONTEND_URL || 'http://localhost:5173' }));
 app.use(express.json());

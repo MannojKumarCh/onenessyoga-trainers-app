@@ -129,6 +129,34 @@ Touched several files this session had just built (`NotificationBell.jsx`, `Sequ
 
 ---
 
+## 7. Code-health cleanup + major dependency upgrades (React 19, Express 5, Prisma 7)
+
+Worked through the deferred findings from the original code-health review, plus the three major-version bumps that had been deliberately postponed to their own session:
+
+**Small fixes (backend):**
+- Fixed an N+1 query in `POST /sessions/bulk` (`sessions.js`) — previously called `ensureTrainerExists` (one `findUnique`) per row in the submitted array; now batches all distinct trainer IDs into a single `findMany` before building the `createMany` payload.
+- Added `backend/src/middleware/validateIdParam.js`, wired via `router.param('id', validateIdParam)` into all 6 CRUD route files (`users.js`, `notifications.js`, `sequences.js`, `sessions.js`, `leaves.js`, `resources.js`) — a non-numeric `:id` now returns a clean 400 instead of an unhandled Prisma error.
+- `backend/src/index.js` now fails fast at boot with a clear message if `DATABASE_URL`, `JWT_SECRET`, or `JWT_EXPIRES_IN` are missing, and warns (without blocking) on missing optional integrations (Resend, Google, VAPID).
+- Added `connection_limit=10&pool_timeout=10&connect_timeout=10` to `DATABASE_URL` (both `.env` and `.env.example`) to bound the Postgres connection pool.
+- Admin Dashboard's clickable stat cards were checked against the original UX review's "keyboard-inaccessible `<div onClick>`" finding — already resolved by the external UI overhaul (commit `4087e14`), which rebuilt them as real `<button>` elements. No change needed.
+
+**React 18.3.1 → 19.2.8** (`frontend/package.json`): clean bump, no source changes required — the app already used `createRoot`/`StrictMode`, zero usage of `propTypes`/`defaultProps`/`forwardRef`/`findDOMNode`/string refs/legacy Context anywhere in `frontend/src`. `react-router-dom`, `@react-oauth/google`, `@heroicons/react`, `vite-plugin-pwa` all confirmed React-19-compatible via their own `peerDependencies`. Verified via `npm run build` (clean) and a full Playwright-driven browser regression pass (login, all 6 admin pages, the custom `Modal` focus-trap logic, mobile viewport) — zero React-19-specific console warnings, report at `Agent Reviews/ux-reviewer/ux-reviewer_2026-08-01_17-15-19.md`.
+
+**Express 4.19 → 5.2.1** (`backend/package.json`): also a clean bump — audited every route across all 7 route files for the known Express 5 breaking changes (wildcard/regex paths, `req.query` mutation, `app.del()`, `res.redirect(status, url)`, legacy `app.param(fn)`) and found none. The shared `asyncHandler` monkeypatch (`backend/src/utils/asyncHandler.js`, identical in all 7 route files) becomes redundant under Express 5's native promise-rejection-to-`next(err)` forwarding, but is harmless left in place — not removed, to keep this change isolated to the version bump. Verified via a full boot + route exercise (login, `/users/trainers` ordering against `/:id`, session/leave/resource/notification round trips, and the `validateIdParam` 400 path).
+
+**Prisma 6.19 → 7.9.1** (`backend/package.json`, `backend/prisma/schema.prisma`, `backend/prisma.config.cjs` (new), `backend/src/db/db.js`): the one upgrade with real required changes, beyond what the initial audit predicted. Prisma 7 **removes the `datasource.url` field from `schema.prisma` entirely** — a driver adapter is now mandatory even for a plain, directly-reachable Postgres database. Changes made:
+  - Removed three dead dependencies that were pre-existing cruft (flagged by the original code-health review, never cleaned up): `@neondatabase/serverless`, `@prisma/adapter-neon` (a stray Prisma-7-line package that predated this upgrade and was never wired into any code — `db.js` always used a plain `new PrismaClient()` against a local Postgres `DATABASE_URL`, not Neon), and `ws`.
+  - Added `@prisma/adapter-pg` (the correct adapter for standard Postgres, not Neon's serverless one).
+  - `schema.prisma`'s `datasource` block now reads just `provider = "postgresql"` (no `url`). Generator block (`provider = "prisma-client-js"`) left untouched — this legacy provider name is still supported in Prisma 7 and keeps CommonJS `require()` imports working unchanged, avoiding the new `prisma-client` provider's mandatory custom `output` path and ESM-first defaults.
+  - New `backend/prisma.config.cjs` supplies `DATABASE_URL` to the Prisma CLI (`generate`/`migrate`) — the CLI no longer reads the connection string from `schema.prisma` itself.
+  - `backend/src/db/db.js` now constructs `new PrismaPg({ connectionString: process.env.DATABASE_URL })` and passes it as `new PrismaClient({ adapter })`.
+  - No new migration was needed — this is a tooling/client change, not a schema change.
+  - Verified via: `prisma generate` succeeding cleanly, a full backend boot + route exercise (same set as the Express step), and a standalone throwaway script exercising the app's one `$transaction` call site (`sequences.js`'s build endpoint — array-form batch transaction, delete-then-recreate `SequenceItem` rows) plus a cascade-delete check, confirming the new engine/adapter behaves identically.
+
+All three upgrades were done as isolated, independently-verified steps per a written plan (each with its own regression pass) rather than one combined change, so a regression in one would never be masked by another.
+
+---
+
 ## Environment variables reference
 
 **`backend/.env`**:
@@ -164,4 +192,4 @@ Touched several files this session had just built (`NotificationBell.jsx`, `Sequ
 1. **Action needed from user**: downgrade the trainer accounts currently shared as Editor on the `GOOGLE_SEQUENCES_FOLDER_ID` Drive folder to Viewer (or remove them) — our code-level read-only restriction can't take effect until the folder-level permissions stop overriding it (see §5).
 2. **Not yet tested**: the dynamic re-share firing correctly when a trainer's Google link is approved after a month's spreadsheet already exists (code exists, live end-to-end test still pending).
 3. **Not built (by decision)**: Sheet→DB two-way sync — see §5's explanation of why this was scoped out.
-4. Minor pre-existing findings from the original agent reviews that were deliberately deferred (not breaking): dependency version bumps (React 18→19, Express 4→5, Prisma 6→7, etc.), `parseInt` NaN validation on route params, N+1 query in bulk session creation, no DB connect timeout, no startup env-var validation, a few low-severity UX polish items. Full detail in `Agent Reviews/`.
+4. ~~Minor pre-existing findings from the original agent reviews~~ — **done** (see §7): dependency version bumps (React 18→19, Express 4→5, Prisma 6→7), `parseInt` NaN validation on route params, N+1 query in bulk session creation, no DB connect timeout, no startup env-var validation. Remaining low-severity UX polish items not yet revisited — full detail in `Agent Reviews/`.

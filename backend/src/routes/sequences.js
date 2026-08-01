@@ -4,11 +4,14 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const { notifyUser, notifyAll } = require('../utils/notify');
 const asyncHandler = require('../utils/asyncHandler');
 const { upsertSequenceInSheet } = require('../utils/sheets');
+const validateIdParam = require('../middleware/validateIdParam');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
   const original = router[method].bind(router);
   router[method] = (path, ...handlers) => original(path, ...handlers.map(handler => asyncHandler(handler)));
 });
+
+router.param('id', validateIdParam);
 
 function httpError(status, message) {
   const err = new Error(message);

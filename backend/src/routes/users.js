@@ -6,11 +6,14 @@ const asyncHandler = require('../utils/asyncHandler');
 const { sendWelcomeEmail, sendGoogleLinkDecisionEmail } = require('../utils/mail');
 const { notifyUser } = require('../utils/notify');
 const { shareSpreadsheetWithTrainer } = require('../utils/sheets');
+const validateIdParam = require('../middleware/validateIdParam');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
   const original = router[method].bind(router);
   router[method] = (path, ...handlers) => original(path, ...handlers.map(handler => asyncHandler(handler)));
 });
+
+router.param('id', validateIdParam);
 
 // Admin: list all trainers
 router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
