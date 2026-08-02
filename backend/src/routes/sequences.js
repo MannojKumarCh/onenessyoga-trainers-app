@@ -59,9 +59,21 @@ function serialize(seq) {
 
 // All roles: view sequences (all can see)
 router.get('/', authenticate, async (req, res) => {
-  const { week } = req.query;
+  const { week, topic, trainer_id, from, to } = req.query;
+
+  const where = {};
+  if (week) where.week_start_date = week;
+  if (topic) where.topic = { contains: topic, mode: 'insensitive' };
+  const trainerId = parseOptionalPositiveInt(trainer_id, 'trainer_id');
+  if (trainerId !== undefined) where.assigned_trainer_id = trainerId;
+  if (from || to) {
+    where.scheduled_date = {};
+    if (from) where.scheduled_date.gte = from;
+    if (to) where.scheduled_date.lte = to;
+  }
+
   const sequences = await prisma.sequence.findMany({
-    where: week ? { week_start_date: week } : {},
+    where,
     include: withNames,
     orderBy: { scheduled_date: 'asc' }
   });

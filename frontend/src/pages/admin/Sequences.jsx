@@ -6,6 +6,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, QueueListIcon, PlusIcon } from '@heroicons/react/24/outline';
 import TopicSelect from '../../components/TopicSelect';
+import SequenceFilters from '../../components/SequenceFilters';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 
@@ -14,6 +15,7 @@ export default function AdminSequences() {
   const [weeks, setWeeks] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState('');
   const [trainers, setTrainers] = useState([]);
+  const [filters, setFilters] = useState({ search: '', trainerId: '', from: '', to: '' });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -26,6 +28,8 @@ export default function AdminSequences() {
 
   const { showToast } = useToast();
 
+  const filtersActive = Boolean(filters.search || filters.trainerId || filters.from || filters.to);
+
   function getWeekStart(dateStr) {
     return format(startOfWeek(new Date(dateStr), { weekStartsOn: 1 }), 'yyyy-MM-dd');
   }
@@ -33,9 +37,17 @@ export default function AdminSequences() {
   const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    const q = selectedWeek ? `?week=${selectedWeek}` : '';
-    client.get(`/sequences${q}`).then(r => setSequences(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
-  }, [selectedWeek]);
+    const params = new URLSearchParams();
+    if (filtersActive) {
+      if (filters.search) params.set('topic', filters.search);
+      if (filters.trainerId) params.set('trainer_id', filters.trainerId);
+      if (filters.from) params.set('from', filters.from);
+      if (filters.to) params.set('to', filters.to);
+    } else if (selectedWeek) {
+      params.set('week', selectedWeek);
+    }
+    client.get(`/sequences?${params.toString()}`).then(r => setSequences(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
+  }, [selectedWeek, filters, filtersActive]);
 
   useEffect(() => {
     Promise.all([client.get('/sequences/weeks'), client.get('/users/trainers')]).then(([w, t]) => {
@@ -46,7 +58,7 @@ export default function AdminSequences() {
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
-  useEffect(() => { if (!selectedWeek) return; load(); }, [selectedWeek, load]);
+  useEffect(() => { if (!filtersActive && !selectedWeek) return; load(); }, [selectedWeek, filtersActive, load]);
   usePolling(load, 30000);
 
   async function submit(e) {
@@ -107,29 +119,40 @@ export default function AdminSequences() {
         <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowForm(true)}><PlusIcon style={{ width: 16, height: 16 }} /> Add Sequence</button>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
-        {weeks.map(w => (
-          <button key={w} onClick={() => setSelectedWeek(w)} style={{
-            padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
-            background: selectedWeek === w ? 'var(--primary)' : 'var(--white)',
-            color: selectedWeek === w ? '#fff' : 'var(--text)',
-            border: '1.5px solid ' + (selectedWeek === w ? 'var(--primary)' : 'var(--border)'),
-            cursor: 'pointer'
-          }}>
-            {format(new Date(w), 'd MMM')}
-          </button>
-        ))}
-      </div>
+      <SequenceFilters
+        trainers={trainers}
+        values={filters}
+        onChange={patch => setFilters(f => ({ ...f, ...patch }))}
+        onClear={() => setFilters({ search: '', trainerId: '', from: '', to: '' })}
+      />
 
-      {selectedWeek && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            Week of {format(new Date(selectedWeek), 'd MMM yyyy')}
-          </span>
-          <button className="btn btn-outline" style={{ fontSize: 13, padding: '6px 14px' }} onClick={notifyWeek} disabled={notifying}>
-            {notifying ? 'Notifying…' : 'Notify Trainers'}
-          </button>
-        </div>
+      {!filtersActive && (
+        <>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
+            {weeks.map(w => (
+              <button key={w} onClick={() => setSelectedWeek(w)} style={{
+                padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
+                background: selectedWeek === w ? 'var(--primary)' : 'var(--white)',
+                color: selectedWeek === w ? '#fff' : 'var(--text)',
+                border: '1.5px solid ' + (selectedWeek === w ? 'var(--primary)' : 'var(--border)'),
+                cursor: 'pointer'
+              }}>
+                {format(new Date(w), 'd MMM')}
+              </button>
+            ))}
+          </div>
+
+          {selectedWeek && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                Week of {format(new Date(selectedWeek), 'd MMM yyyy')}
+              </span>
+              <button className="btn btn-outline" style={{ fontSize: 13, padding: '6px 14px' }} onClick={notifyWeek} disabled={notifying}>
+                {notifying ? 'Notifying…' : 'Notify Trainers'}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {notice.text && (
@@ -148,7 +171,7 @@ export default function AdminSequences() {
       {loading ? <div className="loading">Loading…</div> : loadError ? (
         <div className="empty-state"><div className="empty-state-icon"><ExclamationTriangleIcon style={{ width: 20, height: 20 }} /></div><p>Couldn't load sequences. Please try again.</p></div>
       ) : sequences.length === 0 ? (
-        <div className="empty-state"><div style={{ display: 'flex', justifyContent: 'center', margin: '0 auto 12px' }}><QueueListIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div><p>No sequences this week</p></div>
+        <div className="empty-state"><div style={{ display: 'flex', justifyContent: 'center', margin: '0 auto 12px' }}><QueueListIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div><p>{filtersActive ? 'No sequences match your filters' : 'No sequences this week'}</p></div>
       ) : sequences.map(seq => (
         <div key={seq.id} className="list-item">
           <div className="list-item-left">

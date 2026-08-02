@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { format } from 'date-fns';
 import { ExclamationTriangleIcon, QueueListIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import SequenceFilters from '../../components/SequenceFilters';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 
@@ -12,28 +13,38 @@ export default function Sequences() {
   const [sequences, setSequences] = useState([]);
   const [weeks, setWeeks] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState('');
+  const [trainers, setTrainers] = useState([]);
+  const [filters, setFilters] = useState({ search: '', trainerId: '', from: '', to: '' });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
+  const filtersActive = Boolean(filters.search || filters.trainerId || filters.from || filters.to);
+
   useEffect(() => {
-    client.get('/sequences/weeks').then(r => {
-      setWeeks(r.data);
-      if (r.data.length > 0) setSelectedWeek(r.data[0]);
+    Promise.all([client.get('/sequences/weeks'), client.get('/users/trainers')]).then(([w, t]) => {
+      setWeeks(w.data);
+      setTrainers(t.data);
+      if (w.data.length > 0) setSelectedWeek(w.data[0]);
       else setLoading(false);
     }).catch(() => { setError(true); setLoading(false); });
   }, []);
 
-  useEffect(() => {
-    if (!selectedWeek) return;
-    setLoading(true);
-    client.get(`/sequences?week=${selectedWeek}`).then(r => setSequences(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
-  }, [selectedWeek]);
-
   const load = useCallback(() => {
-    if (!selectedWeek) return;
-    client.get(`/sequences?week=${selectedWeek}`).then(r => setSequences(r.data)).catch(() => setError(true));
-  }, [selectedWeek]);
+    if (!filtersActive && !selectedWeek) return;
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (filtersActive) {
+      if (filters.search) params.set('topic', filters.search);
+      if (filters.trainerId) params.set('trainer_id', filters.trainerId);
+      if (filters.from) params.set('from', filters.from);
+      if (filters.to) params.set('to', filters.to);
+    } else {
+      params.set('week', selectedWeek);
+    }
+    client.get(`/sequences?${params.toString()}`).then(r => setSequences(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
+  }, [selectedWeek, filters, filtersActive]);
 
+  useEffect(() => { load(); }, [load]);
   usePolling(load, 30000);
 
   return (
@@ -42,7 +53,14 @@ export default function Sequences() {
         <h1 className="page-title">Sequences</h1>
       </div>
 
-      {weeks.length > 0 && (
+      <SequenceFilters
+        trainers={trainers}
+        values={filters}
+        onChange={patch => setFilters(f => ({ ...f, ...patch }))}
+        onClear={() => setFilters({ search: '', trainerId: '', from: '', to: '' })}
+      />
+
+      {!filtersActive && weeks.length > 0 && (
         <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 16 }}>
           {weeks.map(w => (
             <button
@@ -67,7 +85,7 @@ export default function Sequences() {
       ) : sequences.length === 0 ? (
         <div className="empty-state">
           <div style={{ display: 'flex', justifyContent: 'center' }}><QueueListIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div>
-          <p>No sequences for this week</p>
+          <p>{filtersActive ? 'No sequences match your filters' : 'No sequences for this week'}</p>
         </div>
       ) : sequences.map(seq => (
         <div key={seq.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sequences/${seq.id}`)}>

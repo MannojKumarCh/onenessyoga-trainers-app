@@ -4,6 +4,7 @@ import { format, startOfWeek } from 'date-fns';
 import { ExclamationTriangleIcon, QueueListIcon, PlusIcon } from '@heroicons/react/24/outline';
 import TopicSelect from '../../components/TopicSelect';
 import Modal from '../../components/Modal';
+import SequenceFilters from '../../components/SequenceFilters';
 import { getApiErrorMessage } from '../../utils/apiError';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
@@ -14,6 +15,7 @@ export default function CreatorSequences() {
   const [weeks, setWeeks] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState('');
   const [trainers, setTrainers] = useState([]);
+  const [filters, setFilters] = useState({ search: '', trainerId: '', from: '', to: '' });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -23,6 +25,8 @@ export default function CreatorSequences() {
   const [notifying, setNotifying] = useState(false);
   const [notice, setNotice] = useState({ type: '', text: '' });
 
+  const filtersActive = Boolean(filters.search || filters.trainerId || filters.from || filters.to);
+
   function getWeekStart(dateStr) {
     return format(startOfWeek(new Date(dateStr), { weekStartsOn: 1 }), 'yyyy-MM-dd');
   }
@@ -30,9 +34,17 @@ export default function CreatorSequences() {
   const load = useCallback(() => {
     setLoading(true);
     setLoadError(false);
-    const q = selectedWeek ? `?week=${selectedWeek}` : '';
-    client.get(`/sequences${q}`).then(r => setSequences(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
-  }, [selectedWeek]);
+    const params = new URLSearchParams();
+    if (filtersActive) {
+      if (filters.search) params.set('topic', filters.search);
+      if (filters.trainerId) params.set('trainer_id', filters.trainerId);
+      if (filters.from) params.set('from', filters.from);
+      if (filters.to) params.set('to', filters.to);
+    } else if (selectedWeek) {
+      params.set('week', selectedWeek);
+    }
+    client.get(`/sequences?${params.toString()}`).then(r => setSequences(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
+  }, [selectedWeek, filters, filtersActive]);
 
   useEffect(() => {
     Promise.all([client.get('/sequences/weeks'), client.get('/users/trainers')]).then(([w, t]) => {
@@ -43,7 +55,7 @@ export default function CreatorSequences() {
     }).catch(() => { setLoadError(true); setLoading(false); });
   }, []);
 
-  useEffect(() => { if (!selectedWeek) return; load(); }, [selectedWeek, load]);
+  useEffect(() => { if (!filtersActive && !selectedWeek) return; load(); }, [selectedWeek, filtersActive, load]);
 
   usePolling(load, 30000);
 
@@ -107,27 +119,38 @@ export default function CreatorSequences() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
-        {weeks.map(w => (
-          <button key={w} onClick={() => setSelectedWeek(w)} style={{
-            padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
-            background: selectedWeek === w ? 'var(--primary)' : 'var(--white)',
-            color: selectedWeek === w ? '#fff' : 'var(--text)',
-            border: '1.5px solid ' + (selectedWeek === w ? 'var(--primary)' : 'var(--border)'),
-            cursor: 'pointer'
-          }}>
-            {format(new Date(w), 'd MMM')}
-          </button>
-        ))}
-      </div>
+      <SequenceFilters
+        trainers={trainers}
+        values={filters}
+        onChange={patch => setFilters(f => ({ ...f, ...patch }))}
+        onClear={() => setFilters({ search: '', trainerId: '', from: '', to: '' })}
+      />
 
-      {selectedWeek && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Week Of {format(new Date(selectedWeek), 'd MMM yyyy')}</span>
-          <button className="btn btn-primary" style={{ fontSize: 13, padding: '6px 14px' }} onClick={notifyWeek} disabled={notifying}>
-            {notifying ? 'Notifying…' : 'Notify All Trainers'}
-          </button>
-        </div>
+      {!filtersActive && (
+        <>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 12 }}>
+            {weeks.map(w => (
+              <button key={w} onClick={() => setSelectedWeek(w)} style={{
+                padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
+                background: selectedWeek === w ? 'var(--primary)' : 'var(--white)',
+                color: selectedWeek === w ? '#fff' : 'var(--text)',
+                border: '1.5px solid ' + (selectedWeek === w ? 'var(--primary)' : 'var(--border)'),
+                cursor: 'pointer'
+              }}>
+                {format(new Date(w), 'd MMM')}
+              </button>
+            ))}
+          </div>
+
+          {selectedWeek && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Week Of {format(new Date(selectedWeek), 'd MMM yyyy')}</span>
+              <button className="btn btn-primary" style={{ fontSize: 13, padding: '6px 14px' }} onClick={notifyWeek} disabled={notifying}>
+                {notifying ? 'Notifying…' : 'Notify All Trainers'}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {notice.text && (
@@ -155,7 +178,7 @@ export default function CreatorSequences() {
           <div style={{ display: 'flex', justifyContent: 'center' }}>
             <QueueListIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)', margin: '0 auto 12px' }} />
           </div>
-          <p>No Sequences Assigned Yet</p>
+          <p>{filtersActive ? 'No Sequences Match Your Filters' : 'No Sequences Assigned Yet'}</p>
         </div>
       ) : sequences.map(seq => (
         <div key={seq.id} className="list-item">
