@@ -47,6 +47,7 @@ function AppRoutes() {
           <Route path="sessions" element={<AdminSessions />} />
           <Route path="leaves" element={<AdminLeaves />} />
           <Route path="sequences" element={<AdminSequences />} />
+          <Route path="sequences/:id" element={<SequenceDetail />} />
           <Route path="resources" element={<AdminResources />} />
           <Route path="notifications" element={<Notifications />} />
         </Route>
@@ -61,6 +62,7 @@ function AppRoutes() {
         <Route path="/" element={<SequenceCreatorLayout />}>
           <Route index element={<CreatorSequences />} />
           <Route path="sequences" element={<CreatorSequences />} />
+          <Route path="sequences/:id" element={<SequenceDetail />} />
           <Route path="notifications" element={<Notifications />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

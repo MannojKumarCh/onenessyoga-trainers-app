@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { format, startOfWeek } from 'date-fns';
 import { ExclamationTriangleIcon, QueueListIcon, PlusIcon } from '@heroicons/react/24/outline';
@@ -10,6 +11,7 @@ import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 
 export default function CreatorSequences() {
+  const navigate = useNavigate();
   const { showToast } = useToast();
   const [sequences, setSequences] = useState([]);
   const [weeks, setWeeks] = useState([]);
@@ -181,7 +183,7 @@ export default function CreatorSequences() {
           <p>{filtersActive ? 'No Sequences Match Your Filters' : 'No Sequences Assigned Yet'}</p>
         </div>
       ) : sequences.map(seq => (
-        <div key={seq.id} className="list-item">
+        <div key={seq.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sequences/${seq.id}`)}>
           <div className="list-item-left">
             <span style={{ fontSize: 11, fontWeight: 700, color: seq.status === 'uploaded' ? 'var(--success)' : 'var(--primary)' }}>
               {seq.status ? seq.status.charAt(0).toUpperCase() + seq.status.slice(1) : ''}
@@ -189,11 +191,11 @@ export default function CreatorSequences() {
             <div className="list-item-title">{seq.topic}</div>
             <div className="list-item-sub">{format(new Date(seq.scheduled_date), 'EEE, d MMM')} · {seq.trainer_name}</div>
             {seq.google_sheet_link && (
-              <a href={seq.google_sheet_link} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--primary)', marginTop: 4, display: 'block' }}>View Sheet</a>
+              <a href={seq.google_sheet_link} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 12, color: 'var(--primary)', marginTop: 4, display: 'block' }}>View Sheet</a>
             )}
           </div>
           {!seq.notified_trainer_at && (
-            <button className="btn btn-outline" style={{ fontSize: 12, padding: '4px 10px' }} onClick={() => notifySingle(seq.id)}>Notify</button>
+            <button className="btn btn-outline" style={{ fontSize: 12, padding: '4px 10px' }} onClick={e => { e.stopPropagation(); notifySingle(seq.id); }}>Notify</button>
           )}
         </div>
       ))}

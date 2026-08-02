@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { format, startOfWeek } from 'date-fns';
 import Modal from '../../components/Modal';
@@ -11,6 +12,7 @@ import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 
 export default function AdminSequences() {
+  const navigate = useNavigate();
   const [sequences, setSequences] = useState([]);
   const [weeks, setWeeks] = useState([]);
   const [selectedWeek, setSelectedWeek] = useState('');
@@ -173,13 +175,13 @@ export default function AdminSequences() {
       ) : sequences.length === 0 ? (
         <div className="empty-state"><div style={{ display: 'flex', justifyContent: 'center', margin: '0 auto 12px' }}><QueueListIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div><p>{filtersActive ? 'No sequences match your filters' : 'No sequences this week'}</p></div>
       ) : sequences.map(seq => (
-        <div key={seq.id} className="list-item">
+        <div key={seq.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sequences/${seq.id}`)}>
           <div className="list-item-left">
             <span style={{ fontSize: 11, fontWeight: 700, color: seq.status === 'uploaded' ? 'var(--success)' : 'var(--primary)', textTransform: 'uppercase' }}>{seq.status}</span>
             <div className="list-item-title">{seq.topic}</div>
             <div className="list-item-sub">{format(new Date(seq.scheduled_date), 'EEE, d MMM')} · {seq.trainer_name}</div>
           </div>
-          <button onClick={() => setDeleteId(seq.id)} style={{ color: 'var(--danger)', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
+          <button onClick={e => { e.stopPropagation(); setDeleteId(seq.id); }} style={{ color: 'var(--danger)', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
         </div>
       ))}
 

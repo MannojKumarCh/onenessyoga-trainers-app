@@ -11,6 +11,10 @@ import { useToast } from '../../context/ToastContext';
 
 const EMPTY_ITEM = { name: '', remarks: '', reference_url: '' };
 
+function isLikelyUrl(value) {
+  return /^https?:\/\//i.test(value.trim());
+}
+
 const sheetHeaderCell = {
   padding: '8px', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)',
   background: 'var(--bg)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)'
@@ -190,14 +194,20 @@ export default function SequenceDetail() {
                 <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>{item.remarks}</div>
               )}
               {item.reference_url && (
-                <a
-                  href={item.reference_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ fontSize: 12, wordBreak: 'break-all', display: 'inline-block', marginTop: 2 }}
-                >
-                  Reference
-                </a>
+                isLikelyUrl(item.reference_url) ? (
+                  <a
+                    href={item.reference_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 12, wordBreak: 'break-all', display: 'inline-block', marginTop: 2 }}
+                  >
+                    Reference
+                  </a>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', wordBreak: 'break-word', marginTop: 2 }}>
+                    Reference: {item.reference_url}
+                  </div>
+                )
               )}
             </div>
           ))}
@@ -208,11 +218,11 @@ export default function SequenceDetail() {
 
       {isAssigned && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <button className="btn btn-primary btn-full" onClick={openUpload}>
-            {seq.status === 'pending' ? 'Upload Google Sheet Link' : 'Edit Google Sheet Link'}
-          </button>
-          <button className="btn btn-ghost btn-full" onClick={openBuilder}>
+          <button className="btn btn-primary btn-full" onClick={openBuilder}>
             {seq.status === 'pending' ? 'Build Sequence' : 'Edit Sequence'}
+          </button>
+          <button className="btn btn-ghost btn-full" onClick={openUpload}>
+            {seq.status === 'pending' ? 'Upload Google Sheet Link' : 'Edit Google Sheet Link'}
           </button>
         </div>
       )}
@@ -296,10 +306,10 @@ export default function SequenceDetail() {
                         onChange={e => updateBuilderItem(index, 'remarks', e.target.value)}
                       />
                       <input
-                        aria-label={`Row ${index + 1} reference url`}
+                        aria-label={`Row ${index + 1} reference`}
                         style={sheetCell(isLast)}
-                        type="url"
-                        placeholder="Optional"
+                        type="text"
+                        placeholder="Optional — text, image, or link"
                         value={item.reference_url}
                         onChange={e => updateBuilderItem(index, 'reference_url', e.target.value)}
                       />
