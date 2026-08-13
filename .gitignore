@@ -17,3 +17,6 @@ build/
 
 # Prisma
 backend/prisma/generated/
+
+# Private local deploy helpers - never commit (may contain VM access details)
+deploy/_*
