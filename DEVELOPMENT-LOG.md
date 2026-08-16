@@ -157,33 +157,34 @@ All three upgrades were done as isolated, independently-verified steps per a wri
 
 ---
 
-## 8. Contabo VM deployment (dev environment live; prod pending)
+## 8. Contabo VM deployment — both dev and prod live
 
-Oracle Cloud was dropped (capacity errors on the free-tier instance). A Contabo VM (Ubuntu 26.04 LTS, 4 vCPU, 7.8GB RAM) was procured to replace it, set up as **two fully isolated environments on one VM**: dev (`tdev.onenessyoga.in`) and prod (`trainers.onenessyoga.in`), each with its own Postgres database, its own backend process/port, and its own git checkout — dev deployed first and validated before prod follows the same pattern.
+Oracle Cloud was dropped (capacity errors on the free-tier instance). A Contabo VM (Ubuntu 26.04 LTS, 4 vCPU, 7.8GB RAM) replaced it, set up as **two fully isolated environments on one VM**: dev (`tdev.onenessyoga.in`) and prod (`trainers.onenessyoga.in`), each with its own Postgres database, its own backend process/port, and its own git checkout.
 
 **Architecture:**
-- `/opt/oneness-yoga/dev/` — git checkout on the `dev` branch; `/opt/oneness-yoga/prod/` — checkout on `main` (not yet created)
-- Backend processes via PM2: `oneness-yoga-dev-api` on port 4000 (prod will be `oneness-yoga-prod-api` on 3000), both internal-only, reverse-proxied by Nginx
+- `/opt/oneness-yoga/dev/` — git checkout on the `dev` branch; `/opt/oneness-yoga/prod/` — checkout on `main` (fast-forwarded to match `dev`'s latest commit before deploying)
+- Backend processes via PM2: `oneness-yoga-dev-api` on port 4000, `oneness-yoga-prod-api` on port 3000, both internal-only, reverse-proxied by Nginx
 - Postgres: one instance, two databases (`oneness_trainers_dev`, `oneness_trainers_prod`) with dedicated least-privilege users (`oneness_dev_user`/`oneness_prod_user`), passwords generated as URL-safe hex (avoids the percent-encoding pitfall a slash/`@` in a generated password would otherwise cause in `DATABASE_URL`)
 - Firewall (ufw): only 22/80/443 open; DB and backend ports are never exposed externally
+- Both subdomains have valid Let's Encrypt certs (expire mid-November, `certbot.timer` handles auto-renewal) and are reachable over real HTTPS from the public internet
 
-**Per-environment secrets are NOT shared** (fresh `JWT_SECRET`, fresh VAPID keypair per environment — push subscriptions are origin-bound anyway since dev/prod are different domains). Google/Resend credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`) are shared across both, since they're the same external accounts — reused directly from the existing local `.env`. **`GOOGLE_SEQUENCES_FOLDER_ID` is deliberately NOT shared** — dev gets its own Google Drive folder once created, to avoid a repeat of the accidental real-trainer-exposure incident from §5 (dev testing must never create/share spreadsheets in the same folder real trainers already browse).
+**Per-environment secrets are NOT shared** (fresh `JWT_SECRET`, fresh VAPID keypair per environment — push subscriptions are origin-bound anyway since dev/prod are different domains). Google/Resend credentials (`GOOGLE_CLIENT_ID`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`) are shared across both, since they're the same external accounts. **`GOOGLE_SEQUENCES_FOLDER_ID` is deliberately NOT shared** — dev has its own dedicated Google Drive folder (separate from prod's), to avoid a repeat of the accidental real-trainer-exposure incident from §5.
 
-**Dev status — deployed and functionally verified over plain HTTP (`Host` header + `curl --resolve` from an external machine, confirming the firewall/public exposure genuinely works, not just loopback):**
-- `npm install` → `prisma generate` → `prisma migrate deploy` (all 4 existing migrations applied cleanly to a fresh `oneness_trainers_dev`) → frontend `npm run build` → `pm2 start`, all succeeded
-- Seeded a dev super_admin with a generated strong password (not the local-dev default `admin1234`)
-- Verified end-to-end through the real deployed stack (Nginx → PM2 → Postgres): login, `GET /users`, and a `POST`/`DELETE /resources` round trip all succeeded
-- PM2 configured to survive VM reboots (`pm2 startup systemd` + `pm2 save`)
-- A **temporary HTTP-only Nginx config** is live for dev (no SSL block yet — the real `deploy/nginx-dev.conf` requires cert files that don't exist until Certbot runs, which needs DNS to resolve first)
+**How it actually happened**: dev was deployed and verified first (initially over plain HTTP, since DNS hadn't propagated yet). DNS propagation, Certbot cert issuance, and — unplanned — a **full independent prod deployment** were then carried out directly on the VM by the user's team while dev verification was still in progress, rather than sequentially after dev sign-off as originally planned. A full audit was done afterward to confirm nothing was at risk: firewall was still clean (22/80/443 only), prod's `DATABASE_URL`/`FRONTEND_URL` pointed at the right places, and **prod's database was completely empty** (0 users, 0 of anything) — so no real data was ever exposed by the parallel setup.
 
-**Still pending (blocked on external factors, not code):**
-1. **DNS**: user needs to create A records for both subdomains → the Contabo VM's IP (~1 day propagation expected, in progress).
-2. **HTTPS**: once DNS resolves, run Certbot for `tdev.onenessyoga.in`, swap the temporary HTTP-only config for `deploy/nginx-dev.conf`. This also unblocks the parts of verification that need a secure context — PWA install and push notification opt-in couldn't be tested over plain HTTP.
-3. **Dev Google Drive folder**: user needs to create it (steps documented when this was planned) and hand over the folder ID so `GOOGLE_SEQUENCES_FOLDER_ID` can be set in dev's `.env` — currently blank, so the Sheets-sync feature is inert on dev until then (degrades gracefully per the existing lazy-init pattern, doesn't block anything else).
-4. **Google Cloud Console**: user needs to add `https://trainers.onenessyoga.in` and `https://tdev.onenessyoga.in` as Authorized JavaScript origins on the OAuth Client, or Google Sign-In will fail on both domains.
-5. **Prod**: deliberately not started yet — only after dev is fully confirmed working over real HTTPS in a browser, per the agreed plan. `main` branch is currently behind `dev` and will need merging before the prod checkout is meaningful.
+**One real bug found and fixed during that audit**: prod's `backend/.env` had `GOOGLE_SERVICE_ACCOUNT_KEY` split across ~29 physical lines (base64 value reflowed by whatever editor was used to paste it in), which broke `dotenv` parsing — confirmed via a live error in the PM2 log (`Failed to initialize Google Sheets client... Unterminated string in JSON`). Fixed by rewriting the value back onto a single line (verified by decoding it and checking `client_email` matched) and restarting the backend; a corrupted backup was kept as `.env.bak-corrupted-<timestamp>` (chmod 600) in case anything needed cross-referencing. A one-time stale error in the same log (a push-subscription foreign-key failure against a now-nonexistent user) was investigated and is historical/inconsequential — consistent with the DB being empty at audit time.
 
-**New deploy scripts** (in `deploy/`, superseding the old Oracle-specific `setup.sh`/`deploy.sh`/`nginx.conf`, which are left in place unused as reference): `contabo-vm-setup.sh` (one-time baseline — Node, Postgres, Nginx, Certbot, PM2, firewall, DB+user creation), `contabo-deploy.sh dev|prod` (repeatable redeploy: git pull, install, migrate, build, PM2 restart), `nginx-dev.conf`/`nginx-prod.conf` (the real HTTPS configs, to be installed once each subdomain's cert exists). `deploy/keepalive.sh` (Oracle's idle-reclaim workaround) isn't needed on Contabo — a real VPS, not a reclaimable free-tier instance.
+**Also completed:**
+- Google Cloud Console: `https://trainers.onenessyoga.in` and `https://tdev.onenessyoga.in` added as Authorized JavaScript origins on the OAuth Client. **No redirect URIs were added** — despite guidance the user received suggesting a `/api/auth/google/callback` redirect URI, this app's Google Sign-In (`POST /api/auth/google`, `backend/src/routes/auth.js:52`) verifies a client-side ID token via Google Identity Services; there is no server-redirect flow and no such route exists, so a redirect URI would never be used.
+- Dev's own Google Drive folder created (`GOOGLE_SEQUENCES_FOLDER_ID=11FQcgqjyxzxY1dIL4j_Fs1FYWwlG-79T`, distinct from prod's `1cWsiP2yOf2E-lHsL3CbYVvczrRm1DTBv`) and wired into dev's `.env`, backend restarted, confirmed initializing without error.
+- Both `/api/health` endpoints confirmed returning `200 ok` over real HTTPS from an external machine.
+
+**Still open:**
+1. Neither environment has been verified in an actual browser yet (PWA install, push notification opt-in, Google Sign-In end-to-end) — only API-level checks (`curl`) have been done so far now that HTTPS is live on both.
+2. No prod admin account exists yet (DB is empty) — needs seeding before anyone can log into prod through the UI.
+3. Sheet→DB two-way sync remains out of scope (§5), and the Drive-folder-permissions cleanup from §5 item 1 is still the user's to do.
+
+**New deploy scripts** (in `deploy/`, superseding the old Oracle-specific `setup.sh`/`deploy.sh`/`nginx.conf`, left in place unused as reference): `contabo-vm-setup.sh` (one-time baseline), `contabo-deploy.sh dev|prod` (repeatable redeploy), `nginx-dev.conf`/`nginx-prod.conf` (HTTPS configs — note the live Nginx configs on the VM were ultimately produced by `certbot --nginx` modifying the initial HTTP-only configs in place, rather than these committed files being installed directly; they remain a correct reference for rebuilding from scratch). `deploy/keepalive.sh` (Oracle's idle-reclaim workaround) isn't needed on Contabo.
 
 ---
 
@@ -223,4 +224,4 @@ Oracle Cloud was dropped (capacity errors on the free-tier instance). A Contabo 
 2. **Not yet tested**: the dynamic re-share firing correctly when a trainer's Google link is approved after a month's spreadsheet already exists (code exists, live end-to-end test still pending).
 3. **Not built (by decision)**: Sheet→DB two-way sync — see §5's explanation of why this was scoped out.
 4. ~~Minor pre-existing findings from the original agent reviews~~ — **done** (see §7): dependency version bumps (React 18→19, Express 4→5, Prisma 6→7), `parseInt` NaN validation on route params, N+1 query in bulk session creation, no DB connect timeout, no startup env-var validation. Remaining low-severity UX polish items not yet revisited — full detail in `Agent Reviews/`.
-5. **Action needed from user**: DNS A records for `trainers.onenessyoga.in`/`tdev.onenessyoga.in`, the dev-only Google Drive folder ID, and the Google Cloud Console OAuth origin additions — see §8. Prod environment setup is blocked on dev being fully confirmed over real HTTPS first.
+5. ~~DNS, dev Google Drive folder, OAuth Console origins~~ — **done** (see §8). Both `trainers.onenessyoga.in` and `tdev.onenessyoga.in` are live over HTTPS. Still open: no browser-level verification yet (PWA/push/Google Sign-In), no prod admin account seeded.
