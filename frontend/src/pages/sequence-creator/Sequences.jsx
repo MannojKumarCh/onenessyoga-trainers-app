@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { format, startOfWeek } from 'date-fns';
-import { ExclamationTriangleIcon, QueueListIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, QueueListIcon, PlusIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import TopicSelect from '../../components/TopicSelect';
 import Modal from '../../components/Modal';
 import SequenceFilters from '../../components/SequenceFilters';
@@ -26,6 +26,10 @@ export default function CreatorSequences() {
   const [error, setError] = useState('');
   const [notifying, setNotifying] = useState(false);
   const [notice, setNotice] = useState({ type: '', text: '' });
+  const [showAiSchedule, setShowAiSchedule] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [aiResult, setAiResult] = useState(null);
 
   const filtersActive = Boolean(filters.search || filters.trainerId || filters.from || filters.to);
 
@@ -112,13 +116,35 @@ export default function CreatorSequences() {
     }
   }
 
+  async function generateAiSchedule() {
+    setShowAiSchedule(true);
+    setAiLoading(true);
+    setAiError('');
+    setAiResult(null);
+    try {
+      const r = await client.post('/sequences/ai-schedule');
+      setAiResult(r.data);
+    } catch (err) {
+      setAiError(err.response?.status === 503
+        ? "AI scheduling isn't set up yet."
+        : getApiErrorMessage(err, 'Failed to generate a schedule'));
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
   return (
     <div className="page">
-      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <h1 className="page-title">Sequences</h1>
-        <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowForm(true)}>
-          <PlusIcon style={{ width: 16, height: 16 }} /> Assign Sequence
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-outline" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={generateAiSchedule}>
+            <SparklesIcon style={{ width: 16, height: 16 }} /> Generate AI Schedule
+          </button>
+          <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowForm(true)}>
+            <PlusIcon style={{ width: 16, height: 16 }} /> Assign Sequence
+          </button>
+        </div>
       </div>
 
       <SequenceFilters
@@ -230,6 +256,43 @@ export default function CreatorSequences() {
                 </button>
               </div>
             </form>
+        </Modal>
+      )}
+
+      {showAiSchedule && (
+        <Modal title="AI Schedule Suggestion" onClose={() => setShowAiSchedule(false)}>
+          {aiLoading ? (
+            <div className="loading">Generating…</div>
+          ) : aiError ? (
+            <p className="error-text">{aiError}</p>
+          ) : aiResult ? (
+            <>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
+                Week of {format(new Date(aiResult.week_start_date), 'd MMM yyyy')} — this is a reference plan only, nothing has been saved. Use "Assign Sequence" to create each day for real.
+              </p>
+              <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                {aiResult.days.map((d, i) => (
+                  <div
+                    key={d.date}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', gap: 10,
+                      padding: '10px 12px',
+                      borderBottom: i < aiResult.days.length - 1 ? '1px solid var(--border)' : 'none'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{d.day}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{format(new Date(d.date), 'd MMM')}</div>
+                    </div>
+                    <div style={{ fontSize: 14, textAlign: 'right' }}>{d.session_type}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowAiSchedule(false)}>Close</button>
+          </div>
         </Modal>
       )}
     </div>

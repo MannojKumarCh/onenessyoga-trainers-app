@@ -1,10 +1,20 @@
 const router = require('express').Router();
+const rateLimit = require('express-rate-limit');
 const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const { notifyUser, notifyAll } = require('../utils/notify');
 const asyncHandler = require('../utils/asyncHandler');
 const { upsertSequenceInSheet } = require('../utils/sheets');
+const { generateWeeklySchedule } = require('../utils/aiScheduler');
 const validateIdParam = require('../middleware/validateIdParam');
+
+const aiScheduleLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many AI schedule requests, please try again later.' }
+});
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
   const original = router[method].bind(router);
@@ -169,6 +179,15 @@ router.post('/notify-week', authenticate, requireRole('super_admin', 'sequence_c
 
   await prisma.sequence.updateMany({ where: { week_start_date }, data: { notified_trainer_at: new Date() } });
   res.json({ success: true });
+});
+
+// Sequence creator: AI-generated reference plan for next week (does not create any Sequence rows)
+router.post('/ai-schedule', authenticate, requireRole('sequence_creator'), aiScheduleLimiter, async (req, res) => {
+  const result = await generateWeeklySchedule();
+  if (!result.configured) {
+    return res.status(503).json({ error: 'AI scheduling is not configured yet' });
+  }
+  res.json(result);
 });
 
 // Shared transition: mark a sequence as uploaded with its Google Sheet link.

@@ -19,7 +19,7 @@ if (missingEnvVars.length > 0) {
   process.exit(1);
 }
 
-const OPTIONAL_ENV_VARS = ['RESEND_API_KEY', 'GOOGLE_SERVICE_ACCOUNT_KEY', 'GOOGLE_CLIENT_ID', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_EMAIL'];
+const OPTIONAL_ENV_VARS = ['RESEND_API_KEY', 'GOOGLE_SERVICE_ACCOUNT_KEY', 'GOOGLE_CLIENT_ID', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_EMAIL', 'OPENROUTER_API_KEY'];
 for (const name of OPTIONAL_ENV_VARS) {
   if (!process.env[name]) {
     console.warn(`Optional environment variable ${name} not set — related features will be disabled.`);
