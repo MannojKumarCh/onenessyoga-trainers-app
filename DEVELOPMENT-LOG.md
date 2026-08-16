@@ -188,6 +188,24 @@ Oracle Cloud was dropped (capacity errors on the free-tier instance). A Contabo 
 
 ---
 
+## 9. AI weekly schedule generator — Phase 1 (commit `623a180`)
+
+First AI feature in the app, and explicitly Phase 1 of a larger planned "AI agent" roadmap: a single button, not a chat interface. Lives on the Sequence Creator's Sequences page only (`frontend/src/pages/sequence-creator/Sequences.jsx`) — "Generate AI Schedule" next to the existing "Assign Sequence" button.
+
+**What it does**: on click, `POST /sequences/ai-schedule` computes next Monday–Saturday, pulls the real last-3-weeks of `Sequence` history from the DB, and asks an LLM (via OpenRouter) to propose a session-type for each of the 6 days, following a fixed 13-rule ruleset (1 mandatory Pilates/week, day-after-Pilates must be Restorative, exactly 1 Intense-tier session/week, a Surya/Chandra Namaskar mandate, spacing rules for "Yoga + Face Yoga" and "Yoga with property" sessions, no repeats within the week or into the next week, Pilates not on the same weekday in consecutive weeks, etc.). Logic lives in new `backend/src/utils/aiScheduler.js`.
+
+**Deliberately a pure reference plan — no DB writes.** The result is just displayed in a read-only modal (day / date / session type). This was a direct decision, not an oversight: the `Sequence` model requires a mandatory `assigned_trainer_id`, and the rules imply multiple trainers can share one day's topic — decisions this tool doesn't make. The Sequence Creator still uses the existing "Assign Sequence" modal to create each real sequence, using the AI's plan as a guide. A "week-level default trainer with per-day override" idea was raised during planning but explicitly deferred as a separate future enhancement to the manual flow, unrelated to this button.
+
+**Topic list**: cross-checked against `TopicSelect.jsx`'s existing 44-item dropdown — every session name in the rules' 3-tier list (Regular/Restorative/Intense) already exists there verbatim (it just groups by yoga-style there, not intensity), so no new topics needed adding anywhere. The intensity-tier categorization is new and lives only inside `aiScheduler.js`.
+
+**LLM**: OpenRouter (OpenAI-compatible REST, plain `fetch` — no new SDK dependency), free-tier model, configurable via `OPENROUTER_MODEL`. **`OPENROUTER_API_KEY` is intentionally not set yet** — the user will add it separately. Until then, wired into the same defensive lazy-init pattern as every other optional integration (`mail.js`, `sheets.js`, `push.js`): the endpoint returns a clean `503 "AI scheduling is not configured yet"` instead of crashing. Rate-limited like login (`express-rate-limit`, 10 requests/15 min).
+
+**Festivals (original rule 12, "flag festivals in a separate column")**: skipped entirely for Phase 1, by decision — no festival/holiday data source exists in this codebase, and building one was out of scope for this pass.
+
+**Verified**: role-gating (`sequence_creator` only, 403 for others), the not-configured 503 path, and the full generate pipeline end-to-end via a mocked API response — confirmed the prompt correctly embeds the rules and real sequence history, markdown-fence stripping and JSON parsing work, and three deliberate failure cases (invalid topic name, malformed JSON, wrong entry count) are all correctly rejected. **Not yet verified**: an actual live browser click-through (deferred — Playwright automation was unavailable in-session for both the main agent and the `ux-reviewer` subagent), and real output quality (can't be judged until the real API key is added).
+
+---
+
 ## Environment variables reference
 
 **`backend/.env`**:
@@ -225,3 +243,4 @@ Oracle Cloud was dropped (capacity errors on the free-tier instance). A Contabo 
 3. **Not built (by decision)**: Sheet→DB two-way sync — see §5's explanation of why this was scoped out.
 4. ~~Minor pre-existing findings from the original agent reviews~~ — **done** (see §7): dependency version bumps (React 18→19, Express 4→5, Prisma 6→7), `parseInt` NaN validation on route params, N+1 query in bulk session creation, no DB connect timeout, no startup env-var validation. Remaining low-severity UX polish items not yet revisited — full detail in `Agent Reviews/`.
 5. ~~DNS, dev Google Drive folder, OAuth Console origins~~ — **done** (see §8). Both `trainers.onenessyoga.in` and `tdev.onenessyoga.in` are live over HTTPS. Still open: no browser-level verification yet (PWA/push/Google Sign-In), no prod admin account seeded.
+6. **Action needed from user**: add `OPENROUTER_API_KEY` to `backend/.env` to actually enable the AI weekly schedule generator (see §9) — feature is deployed but inert without it. Also still pending: a live browser click-through and a real-output quality check, both blocked on the key being added.
