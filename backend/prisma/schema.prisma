@@ -58,6 +58,7 @@ model User {
   resources_created  Resource[]
   push_subscriptions PushSubscription[]
   notifications      Notification[]
+  ai_schedule_logs   AiScheduleLog[]
 
   @@map("users")
 }
@@ -194,4 +195,14 @@ model Notification {
   @@index([user_id, is_read])
   @@index([user_id, created_at])
   @@map("notifications")
+}
+
+model AiScheduleLog {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at DateTime @default(now())
+
+  @@index([user_id, created_at])
+  @@map("ai_schedule_logs")
 }

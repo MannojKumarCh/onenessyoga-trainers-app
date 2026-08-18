@@ -5,7 +5,7 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const { notifyUser, notifyAll } = require('../utils/notify');
 const asyncHandler = require('../utils/asyncHandler');
 const { upsertSequenceInSheet } = require('../utils/sheets');
-const { generateWeeklySchedule } = require('../utils/aiScheduler');
+const { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration } = require('../utils/aiScheduler');
 const validateIdParam = require('../middleware/validateIdParam');
 
 const aiScheduleLimiter = rateLimit({
@@ -181,13 +181,25 @@ router.post('/notify-week', authenticate, requireRole('super_admin', 'sequence_c
   res.json({ success: true });
 });
 
+// Sequence creator: how many AI schedule generations they have left today (IST)
+router.get('/ai-schedule/usage', authenticate, requireRole('sequence_creator'), async (req, res) => {
+  res.json(await getDailyUsage(req.user.id));
+});
+
 // Sequence creator: AI-generated reference plan for next week (does not create any Sequence rows)
 router.post('/ai-schedule', authenticate, requireRole('sequence_creator'), aiScheduleLimiter, async (req, res) => {
+  const usage = await getDailyUsage(req.user.id);
+  if (usage.remaining <= 0) {
+    return res.status(429).json({ error: 'Daily limit of 5 AI schedule generations reached. Resets at midnight IST.', ...usage });
+  }
+
   const result = await generateWeeklySchedule();
   if (!result.configured) {
     return res.status(503).json({ error: 'AI scheduling is not configured yet' });
   }
-  res.json(result);
+
+  await logSuccessfulGeneration(req.user.id);
+  res.json({ ...result, used: usage.used + 1, remaining: usage.remaining - 1, limit: usage.limit });
 });
 
 // Shared transition: mark a sequence as uploaded with its Google Sheet link.

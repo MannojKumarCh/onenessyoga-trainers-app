@@ -30,6 +30,7 @@ export default function CreatorSequences() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [aiResult, setAiResult] = useState(null);
+  const [aiUsage, setAiUsage] = useState(null);
 
   const filtersActive = Boolean(filters.search || filters.trainerId || filters.from || filters.to);
 
@@ -59,6 +60,8 @@ export default function CreatorSequences() {
       if (w.data.length > 0) setSelectedWeek(w.data[0]);
       else setLoading(false);
     }).catch(() => { setLoadError(true); setLoading(false); });
+
+    client.get('/sequences/ai-schedule/usage').then(r => setAiUsage(r.data)).catch(() => {});
   }, []);
 
   useEffect(() => { if (!filtersActive && !selectedWeek) return; load(); }, [selectedWeek, filtersActive, load]);
@@ -124,9 +127,13 @@ export default function CreatorSequences() {
     try {
       const r = await client.post('/sequences/ai-schedule');
       setAiResult(r.data);
+      setAiUsage({ used: r.data.used, remaining: r.data.remaining, limit: r.data.limit });
     } catch (err) {
+      if (err.response?.data?.remaining !== undefined) setAiUsage(err.response.data);
       setAiError(err.response?.status === 503
         ? "AI scheduling isn't set up yet."
+        : err.response?.status === 429
+        ? err.response.data.error
         : getApiErrorMessage(err, 'Failed to generate a schedule'));
     } finally {
       setAiLoading(false);
@@ -138,8 +145,16 @@ export default function CreatorSequences() {
       <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <h1 className="page-title">Sequences</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-outline" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={generateAiSchedule}>
-            <SparklesIcon style={{ width: 16, height: 16 }} /> Generate AI Schedule
+          <button
+            className="btn btn-outline"
+            style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }}
+            onClick={generateAiSchedule}
+            disabled={aiUsage && aiUsage.remaining <= 0}
+          >
+            <SparklesIcon style={{ width: 16, height: 16 }} />
+            {aiUsage && aiUsage.remaining <= 0
+              ? 'Daily AI Limit Reached'
+              : `Generate AI Schedule${aiUsage ? ` (${aiUsage.remaining} left today)` : ''}`}
           </button>
           <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowForm(true)}>
             <PlusIcon style={{ width: 16, height: 16 }} /> Assign Sequence
@@ -288,6 +303,9 @@ export default function CreatorSequences() {
                   </div>
                 ))}
               </div>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 10 }}>
+                {aiResult.remaining} of {aiResult.limit} generations left today.
+              </p>
             </>
           ) : null}
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>

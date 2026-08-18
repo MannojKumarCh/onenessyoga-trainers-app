@@ -3,6 +3,32 @@ const prisma = require('../db/db');
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free';
 
+const DAILY_LIMIT = 5;
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // IST has no DST, fixed UTC+5:30 offset
+
+// Returns the [start, end) UTC instants corresponding to "today" in IST,
+// regardless of the server's own timezone.
+function getIstDayBoundsUtc(date = new Date()) {
+  const istNow = new Date(date.getTime() + IST_OFFSET_MS);
+  const istMidnightUtcMs = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()) - IST_OFFSET_MS;
+  return {
+    startOfDayUtc: new Date(istMidnightUtcMs),
+    endOfDayUtc: new Date(istMidnightUtcMs + 24 * 60 * 60 * 1000)
+  };
+}
+
+async function getDailyUsage(userId) {
+  const { startOfDayUtc, endOfDayUtc } = getIstDayBoundsUtc();
+  const used = await prisma.aiScheduleLog.count({
+    where: { user_id: userId, created_at: { gte: startOfDayUtc, lt: endOfDayUtc } }
+  });
+  return { used, remaining: Math.max(0, DAILY_LIMIT - used), limit: DAILY_LIMIT };
+}
+
+async function logSuccessfulGeneration(userId) {
+  await prisma.aiScheduleLog.create({ data: { user_id: userId } });
+}
+
 const SESSION_TYPES = {
   'Regular Sessions': [
     'Chandra Namaskar + Yoga',
@@ -211,4 +237,4 @@ async function generateWeeklySchedule() {
   return { configured: true, week_start_date, days: schedule };
 }
 
-module.exports = { generateWeeklySchedule, SESSION_TYPES };
+module.exports = { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration, SESSION_TYPES, DAILY_LIMIT };
