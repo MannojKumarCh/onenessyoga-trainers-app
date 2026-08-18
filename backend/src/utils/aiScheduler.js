@@ -1,7 +1,8 @@
 const prisma = require('../db/db');
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free';
+const OPENROUTER_TIMEOUT_MS = 60 * 1000;
 
 const DAILY_LIMIT = 5;
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // IST has no DST, fixed UTC+5:30 offset
@@ -150,27 +151,44 @@ Respond with ONLY a JSON array (no prose, no markdown code fences) of exactly 6 
   return { system, user };
 }
 
-async function callOpenRouter(prompt) {
-  if (!OPENROUTER_API_KEY) {
-    console.warn('OPENROUTER_API_KEY not configured — AI scheduling unavailable');
-    return null;
+class OpenRouterRateLimitError extends Error {}
+
+// One bounded attempt. Returns the content string, or null if the model
+// replied successfully but with no content (caller decides whether to retry).
+async function callOpenRouterOnce(prompt) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: OPENROUTER_MODEL,
+        messages: [
+          { role: 'system', content: prompt.system },
+          { role: 'user', content: prompt.user }
+        ],
+        temperature: 0.7
+      }),
+      signal: controller.signal
+    });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`OpenRouter request timed out after ${OPENROUTER_TIMEOUT_MS / 1000}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
   }
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: OPENROUTER_MODEL,
-      messages: [
-        { role: 'system', content: prompt.system },
-        { role: 'user', content: prompt.user }
-      ],
-      temperature: 0.7
-    })
-  });
+  if (response.status === 429) {
+    throw new OpenRouterRateLimitError("OpenRouter's free-tier rate limit was reached. Try again later, or add credits to the OpenRouter account to raise the limit.");
+  }
 
   if (!response.ok) {
     const text = await response.text().catch(() => '');
@@ -178,9 +196,23 @@ async function callOpenRouter(prompt) {
   }
 
   const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
+  return data.choices?.[0]?.message?.content || null;
+}
+
+async function callOpenRouter(prompt) {
+  if (!OPENROUTER_API_KEY) {
+    console.warn('OPENROUTER_API_KEY not configured — AI scheduling unavailable');
+    return null;
+  }
+
+  // Some free-tier "reasoning" models occasionally spend their whole budget
+  // thinking and return an empty final answer - one retry usually succeeds.
+  let content = await callOpenRouterOnce(prompt);
   if (!content) {
-    throw new Error('OpenRouter response had no content');
+    content = await callOpenRouterOnce(prompt);
+  }
+  if (!content) {
+    throw new Error('OpenRouter response had no content (after retry)');
   }
 
   return content;
@@ -237,4 +269,4 @@ async function generateWeeklySchedule() {
   return { configured: true, week_start_date, days: schedule };
 }
 
-module.exports = { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration, SESSION_TYPES, DAILY_LIMIT };
+module.exports = { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration, SESSION_TYPES, DAILY_LIMIT, OpenRouterRateLimitError };

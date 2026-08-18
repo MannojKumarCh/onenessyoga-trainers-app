@@ -5,7 +5,7 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const { notifyUser, notifyAll } = require('../utils/notify');
 const asyncHandler = require('../utils/asyncHandler');
 const { upsertSequenceInSheet } = require('../utils/sheets');
-const { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration } = require('../utils/aiScheduler');
+const { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration, OpenRouterRateLimitError } = require('../utils/aiScheduler');
 const validateIdParam = require('../middleware/validateIdParam');
 
 const aiScheduleLimiter = rateLimit({
@@ -193,7 +193,15 @@ router.post('/ai-schedule', authenticate, requireRole('sequence_creator'), aiSch
     return res.status(429).json({ error: 'Daily limit of 5 AI schedule generations reached. Resets at midnight IST.', ...usage });
   }
 
-  const result = await generateWeeklySchedule();
+  let result;
+  try {
+    result = await generateWeeklySchedule();
+  } catch (err) {
+    if (err instanceof OpenRouterRateLimitError) {
+      return res.status(502).json({ error: err.message });
+    }
+    throw err;
+  }
   if (!result.configured) {
     return res.status(503).json({ error: 'AI scheduling is not configured yet' });
   }
