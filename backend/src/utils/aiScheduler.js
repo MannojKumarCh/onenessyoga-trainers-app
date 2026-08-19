@@ -187,7 +187,13 @@ async function callOpenRouterOnce(prompt) {
   }
 
   if (response.status === 429) {
-    throw new OpenRouterRateLimitError("OpenRouter's free-tier rate limit was reached. Try again later, or add credits to the OpenRouter account to raise the limit.");
+    const body = await response.json().catch(() => null);
+    const upstreamReason = body?.error?.metadata?.raw || body?.error?.message;
+    throw new OpenRouterRateLimitError(
+      upstreamReason
+        ? `OpenRouter rate limit: ${upstreamReason}`
+        : "OpenRouter's free-tier rate limit was reached. Try again later, or add credits to the OpenRouter account to raise the limit."
+    );
   }
 
   if (!response.ok) {
