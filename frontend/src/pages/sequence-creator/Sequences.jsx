@@ -31,6 +31,10 @@ export default function CreatorSequences() {
   const [aiError, setAiError] = useState('');
   const [aiResult, setAiResult] = useState(null);
   const [aiUsage, setAiUsage] = useState(null);
+  const [planItems, setPlanItems] = useState([]);
+  const [defaultTrainerId, setDefaultTrainerId] = useState('');
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkError, setBulkError] = useState('');
 
   const filtersActive = Boolean(filters.search || filters.trainerId || filters.from || filters.to);
 
@@ -124,10 +128,13 @@ export default function CreatorSequences() {
     setAiLoading(true);
     setAiError('');
     setAiResult(null);
+    setBulkError('');
+    setDefaultTrainerId('');
     try {
       const r = await client.post('/sequences/ai-schedule');
       setAiResult(r.data);
       setAiUsage({ used: r.data.used, remaining: r.data.remaining, limit: r.data.limit });
+      setPlanItems(r.data.days.map(d => ({ scheduled_date: d.date, day: d.day, topic: d.session_type, assigned_trainer_id: '' })));
     } catch (err) {
       if (err.response?.data?.remaining !== undefined) setAiUsage(err.response.data);
       setAiError(err.response?.status === 503
@@ -137,6 +144,42 @@ export default function CreatorSequences() {
         : getApiErrorMessage(err, 'Failed to generate a schedule'));
     } finally {
       setAiLoading(false);
+    }
+  }
+
+  function applyDefaultTrainer(trainerId) {
+    setDefaultTrainerId(trainerId);
+    setPlanItems(items => items.map(item => ({ ...item, assigned_trainer_id: trainerId })));
+  }
+
+  function updatePlanItem(index, field, value) {
+    setPlanItems(items => items.map((item, i) => i === index ? { ...item, [field]: value } : item));
+  }
+
+  const planReadyToSubmit = planItems.length > 0 && planItems.every(item => item.topic.trim() && item.assigned_trainer_id);
+
+  async function submitBulkSequences() {
+    if (!planReadyToSubmit) return;
+    setBulkSubmitting(true);
+    setBulkError('');
+    try {
+      await client.post('/sequences/bulk', {
+        week_start_date: aiResult.week_start_date,
+        sequences: planItems.map(item => ({
+          scheduled_date: item.scheduled_date,
+          topic: item.topic,
+          assigned_trainer_id: Number(item.assigned_trainer_id)
+        }))
+      });
+      setShowAiSchedule(false);
+      showToast('Week Created From AI Schedule');
+      const w = aiResult.week_start_date;
+      if (!weeks.includes(w)) setWeeks([w, ...weeks]);
+      setSelectedWeek(w);
+    } catch (err) {
+      setBulkError(getApiErrorMessage(err, 'Failed to create the sequences for this week'));
+    } finally {
+      setBulkSubmitting(false);
     }
   }
 
@@ -283,33 +326,76 @@ export default function CreatorSequences() {
           ) : aiResult ? (
             <>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>
-                Week of {format(new Date(aiResult.week_start_date), 'd MMM yyyy')} — this is a reference plan only, nothing has been saved. Use "Assign Sequence" to create each day for real.
+                Week of {format(new Date(aiResult.week_start_date), 'd MMM yyyy')} — review and adjust below, then create all 6 sequences at once. Nothing is saved until you confirm.
               </p>
+
+              <div className="form-group">
+                <label className="label" htmlFor="ai-plan-default-trainer">Default Trainer For The Week</label>
+                <select
+                  id="ai-plan-default-trainer"
+                  className="input"
+                  value={defaultTrainerId}
+                  onChange={e => applyDefaultTrainer(e.target.value)}
+                >
+                  <option value="">Select trainer…</option>
+                  {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+
               <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                {aiResult.days.map((d, i) => (
+                {planItems.map((item, i) => (
                   <div
-                    key={d.date}
+                    key={item.scheduled_date}
                     style={{
-                      display: 'flex', justifyContent: 'space-between', gap: 10,
                       padding: '10px 12px',
-                      borderBottom: i < aiResult.days.length - 1 ? '1px solid var(--border)' : 'none'
+                      borderBottom: i < planItems.length - 1 ? '1px solid var(--border)' : 'none'
                     }}
                   >
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{d.day}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{format(new Date(d.date), 'd MMM')}</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontWeight: 600, fontSize: 14 }}>{item.day}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{format(new Date(item.scheduled_date), 'd MMM')}</span>
                     </div>
-                    <div style={{ fontSize: 14, textAlign: 'right' }}>{d.session_type}</div>
+                    <div style={{ marginBottom: 6 }}>
+                      <TopicSelect
+                        id={`ai-plan-topic-${i}`}
+                        value={item.topic}
+                        onChange={val => updatePlanItem(i, 'topic', val)}
+                        required
+                      />
+                    </div>
+                    <select
+                      aria-label={`Trainer for ${item.day}`}
+                      className="input"
+                      value={item.assigned_trainer_id}
+                      onChange={e => updatePlanItem(i, 'assigned_trainer_id', e.target.value)}
+                    >
+                      <option value="">Select trainer…</option>
+                      {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
                   </div>
                 ))}
               </div>
+
+              {bulkError && <p className="error-text" style={{ marginTop: 12 }}>{bulkError}</p>}
+
               <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 10 }}>
                 {aiResult.remaining} of {aiResult.limit} generations left today.
               </p>
             </>
           ) : null}
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowAiSchedule(false)}>Close</button>
+            <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowAiSchedule(false)}>Cancel</button>
+            {aiResult && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                onClick={submitBulkSequences}
+                disabled={!planReadyToSubmit || bulkSubmitting}
+              >
+                {bulkSubmitting ? 'Creating…' : 'Create All Sequences'}
+              </button>
+            )}
           </div>
         </Modal>
       )}

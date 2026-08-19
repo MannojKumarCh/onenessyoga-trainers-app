@@ -140,6 +140,43 @@ router.post('/', authenticate, requireRole('super_admin', 'sequence_creator'), a
   res.status(201).json({ id: seq.id });
 });
 
+// Sequence creator: bulk-create a week's worth of sequences (e.g. confirming
+// an AI-generated schedule). All-or-nothing - createMany is one atomic INSERT.
+router.post('/bulk', authenticate, requireRole('sequence_creator'), async (req, res) => {
+  const { week_start_date, sequences } = req.body;
+  if (!week_start_date || !Array.isArray(sequences) || sequences.length === 0) {
+    throw httpError(400, 'week_start_date and a non-empty sequences array are required');
+  }
+
+  const trainerIds = sequences.map(s => parsePositiveInt(s.assigned_trainer_id, 'assigned_trainer_id'));
+  const uniqueTrainerIds = [...new Set(trainerIds)];
+
+  const trainers = await prisma.user.findMany({
+    where: { id: { in: uniqueTrainerIds }, role: 'trainer' },
+    select: { id: true }
+  });
+  if (trainers.length !== uniqueTrainerIds.length) {
+    throw httpError(400, 'assigned_trainer_id must reference an existing trainer');
+  }
+
+  const data = sequences.map((s, i) => {
+    const trimmedTopic = String(s.topic || '').trim();
+    if (!s.scheduled_date || !trimmedTopic) {
+      throw httpError(400, `sequences[${i}]: scheduled_date and topic are required`);
+    }
+    return {
+      week_start_date,
+      scheduled_date: s.scheduled_date,
+      topic: trimmedTopic,
+      assigned_trainer_id: trainerIds[i],
+      created_by: req.user.id
+    };
+  });
+
+  const created = await prisma.sequence.createMany({ data });
+  res.status(201).json({ count: created.count });
+});
+
 // Sequence creator / admin: notify assigned trainer
 router.post('/:id/notify-trainer', authenticate, requireRole('super_admin', 'sequence_creator'), async (req, res) => {
   const id = parseInt(req.params.id);
