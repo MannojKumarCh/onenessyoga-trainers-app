@@ -53,6 +53,22 @@ async function ensureTrainerExists(trainerId) {
   }
 }
 
+const MAX_BACKDATE_DAYS = 7;
+
+function toDateString(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Sequence creators can't backdate more than a week; super_admin is exempt
+// (e.g. for corrections/backfill).
+function assertNotBackdated(scheduledDate) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - MAX_BACKDATE_DAYS);
+  if (scheduledDate < toDateString(cutoff)) {
+    throw httpError(400, `scheduled_date cannot be more than ${MAX_BACKDATE_DAYS} days in the past`);
+  }
+}
+
 const withNames = {
   assigned_trainer: { select: { name: true } },
   creator: { select: { name: true } }
@@ -117,6 +133,7 @@ router.post('/', authenticate, requireRole('super_admin', 'sequence_creator'), a
   if (!week_start_date || !scheduled_date || !topic) {
     throw httpError(400, 'week_start_date, scheduled_date, and topic are required');
   }
+  if (req.user.role === 'sequence_creator') assertNotBackdated(scheduled_date);
 
   const trainerId = parsePositiveInt(assigned_trainer_id, 'assigned_trainer_id');
   const trimmedTopic = String(topic).trim();
@@ -164,6 +181,7 @@ router.post('/bulk', authenticate, requireRole('sequence_creator'), async (req, 
     if (!s.scheduled_date || !trimmedTopic) {
       throw httpError(400, `sequences[${i}]: scheduled_date and topic are required`);
     }
+    assertNotBackdated(s.scheduled_date);
     return {
       week_start_date,
       scheduled_date: s.scheduled_date,

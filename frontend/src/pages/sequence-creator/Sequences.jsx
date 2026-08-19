@@ -38,6 +38,8 @@ export default function CreatorSequences() {
 
   const filtersActive = Boolean(filters.search || filters.trainerId || filters.from || filters.to);
 
+  const minScheduledDate = format(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+
   function getWeekStart(dateStr) {
     return format(startOfWeek(new Date(dateStr), { weekStartsOn: 1 }), 'yyyy-MM-dd');
   }
@@ -289,7 +291,7 @@ export default function CreatorSequences() {
             <form onSubmit={submit}>
               <div className="form-group">
                 <label className="label" htmlFor="creator-seq-date">Date</label>
-                <input id="creator-seq-date" className="input" type="date" value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} required />
+                <input id="creator-seq-date" className="input" type="date" min={minScheduledDate} value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} required />
               </div>
               <div className="form-group">
                 <label className="label" htmlFor="creator-seq-topic">Topic</label>
