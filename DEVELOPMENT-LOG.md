@@ -221,6 +221,8 @@ First AI feature in the app, and explicitly Phase 1 of a larger planned "AI agen
 
 Verified directly against the real backend (happy path, atomic rejection on an invalid trainer id with nothing partially created, `super_admin` correctly 403'd), independently re-verified by a second pass with a different mixed-trainer payload, and code-reviewed line-by-line against the spec. **Still not yet verified**: an actual live browser/DOM click-through of the editable modal itself (Playwright automation was unavailable in-session across every attempt this work), and real-output validation specifically for `google/gemma-4-31b-it:free` (both blocked by transient free-tier provider issues at time of writing).
 
+**Backdating guard** (commit `6514392`): Sequence Creator can no longer create a sequence dated more than 7 days in the past, enforced server-side (authoritative) via `assertNotBackdated()` in both `POST /` and `POST /bulk`. Super Admin is exempt on the shared single-create endpoint (may need to backfill/correct older entries) — the check only runs when `req.user.role === 'sequence_creator'` there, and unconditionally on `/bulk` since that endpoint is already sequence-creator-only. Also added a `min` attribute to the Sequence Creator's own date picker for immediate browser-native feedback; Admin's form is untouched. Verified directly: exactly 7 days back allowed (boundary), 8+ days back rejected, Super Admin can still backdate 30 days, and the bulk endpoint rejects the whole batch if any single day violates the rule.
+
 ---
 
 ## Environment variables reference
