@@ -202,6 +202,15 @@ async function callOpenRouterOnce(prompt) {
   }
 
   const data = await response.json();
+
+  // OpenRouter sometimes proxies an upstream provider failure as HTTP 200
+  // with an `error` field instead of `choices` - surface that reason
+  // directly rather than silently falling through to "no content".
+  if (data.error) {
+    const reason = data.error.metadata?.raw || data.error.message || 'unknown upstream error';
+    throw new Error(`OpenRouter/upstream provider error: ${reason}`);
+  }
+
   return data.choices?.[0]?.message?.content || null;
 }
 
