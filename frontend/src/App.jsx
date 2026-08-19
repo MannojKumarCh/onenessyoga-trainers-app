@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import LoginPage from './pages/LoginPage';
@@ -32,9 +32,36 @@ function usePageTitle() {
   }, [pathname]);
 }
 
+// Sends an already-logged-in user back to their home dashboard on a genuine
+// fresh app boot (new tab, freshly (re)launched PWA) if they land on some
+// other page - e.g. a mobile OS resuming/relaunching the PWA into a stale
+// route from before. Runs exactly once per real JS load (empty dep array),
+// so it can never fire again on later in-app navigation, and it never
+// touches a session that's merely resuming in the background (that's the
+// same live JS context - this effect already ran once at its original
+// boot). Skips the redirect when the URL carries the notification
+// deep-link marker (see sw.js's notificationclick handler), so tapping a
+// push notification still takes you straight to the relevant page.
+function useRedirectHomeOnFreshBoot(user) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (sessionStorage.getItem('appBooted')) return;
+    sessionStorage.setItem('appBooted', '1');
+
+    const isNotificationDeepLink = new URLSearchParams(location.search).get('entry') === 'notification';
+    if (user && location.pathname !== '/' && !isNotificationDeepLink) {
+      navigate('/', { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
 function AppRoutes() {
   const { user } = useAuth();
   usePageTitle();
+  useRedirectHomeOnFreshBoot(user);
 
   if (!user) return <Routes><Route path="*" element={<LoginPage />} /></Routes>;
 

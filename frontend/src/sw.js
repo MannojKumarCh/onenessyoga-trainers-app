@@ -58,7 +58,12 @@ self.addEventListener('notificationclick', event => {
       }
     }
     if (self.clients.openWindow) {
-      await self.clients.openWindow(fullUrl);
+      // Mark this as an intentional deep link so the app's fresh-boot
+      // redirect-to-home logic (for cold starts landing on a stale route)
+      // doesn't override it.
+      const openUrl = new URL(fullUrl);
+      openUrl.searchParams.set('entry', 'notification');
+      await self.clients.openWindow(openUrl.href);
     }
   })());
 });
