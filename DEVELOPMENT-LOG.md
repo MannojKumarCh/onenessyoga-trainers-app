@@ -285,6 +285,16 @@ Verified: `npm run build` clean, all 45 manifest slugs cross-checked 1:1 against
 
 ---
 
+## 12. Install-to-home-screen button
+
+Added a custom "Install App" control since the browser's own install UI (Chrome's address-bar icon, the mini-infobar) is easy to miss. `frontend/src/hooks/useInstallPrompt.js` captures the `beforeinstallprompt` event once (`e.preventDefault()`) and replays it on demand via `promptInstall()`; it exposes `installed` (checked via `matchMedia('(display-mode: standalone)')` plus the legacy `navigator.standalone` for iOS) so already-installed users never see the button, and listens for `appinstalled` to hide it immediately post-install without a page reload.
+
+iOS Safari never fires `beforeinstallprompt` - there is no programmatic install API there, only Share -> "Add to Home Screen". `InstallAppButton.jsx` detects this case (`needsManualIosSteps`) and shows a small instructions modal instead of a broken button. Wired in two places: a header icon button (`AppLayout.jsx`, next to the notification bell) for logged-in users, and a text button under the login card (`LoginPage.jsx`) so first-time visitors can install before ever signing in.
+
+**Known limitation, by design of the web platform (not a gap to fix here):** there is no way for a website to force an already-installed PWA to open instead of a browser tab when its URL is visited. That behavior is entirely OS/browser-controlled - on Android it requires wrapping the PWA as a Trusted Web Activity, publishing it to the Play Store, and hosting a Digital Asset Links file for verification (a materially bigger project than the web app itself); iOS Safari has no equivalent mechanism at all for PWAs; desktop has none either. Flagged to the user as a real platform constraint rather than attempted.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).

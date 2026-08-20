@@ -2,6 +2,7 @@ import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import PushNotificationsPrompt from './PushNotificationsPrompt';
 import NotificationBell from './NotificationBell';
+import InstallAppButton from './InstallAppButton';
 import { buildNav } from '../config/nav';
 import { formatRole } from '../utils/formatRole';
 import { ArrowRightStartOnRectangleIcon } from '@heroicons/react/24/outline';
@@ -20,6 +21,7 @@ export default function AppLayout() {
           <span style={{ fontWeight: 400, opacity: 0.8, fontSize: 13 }}>{roleLabel}</span>
         </div>
         <div className="app-header-actions">
+          <InstallAppButton variant="icon" />
           <NotificationBell />
           <button onClick={logout} className="header-icon-btn" aria-label="Logout" title="Logout">
             <ArrowRightStartOnRectangleIcon style={{ width: 20, height: 20 }} />

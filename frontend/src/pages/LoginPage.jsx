@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import PasswordInput from '../components/PasswordInput';
+import InstallAppButton from '../components/InstallAppButton';
 
 export default function LoginPage() {
   const { login, loginWithGoogle } = useAuth();
@@ -122,6 +123,8 @@ export default function LoginPage() {
               {googleMessage.text}
             </p>
           )}
+
+          <InstallAppButton variant="text" />
         </div>
       </div>
     </div>
