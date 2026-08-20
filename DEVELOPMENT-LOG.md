@@ -293,6 +293,8 @@ iOS Safari never fires `beforeinstallprompt` - there is no programmatic install 
 
 **Known limitation, by design of the web platform (not a gap to fix here):** there is no way for a website to force an already-installed PWA to open instead of a browser tab when its URL is visited. That behavior is entirely OS/browser-controlled - on Android it requires wrapping the PWA as a Trusted Web Activity, publishing it to the Play Store, and hosting a Digital Asset Links file for verification (a materially bigger project than the web app itself); iOS Safari has no equivalent mechanism at all for PWAs; desktop has none either. Flagged to the user as a real platform constraint rather than attempted.
 
+**Bug fix** (commit `dd034f6`): the button didn't appear at all on first live testing, even in a normal (non-incognito) window. Root cause: `beforeinstallprompt` fires at most once per page load, but the event was captured into that one component's local React state - since this is a single-page app, logging in unmounts the login page (which may have captured it) and mounts the dashboard fresh, with no new page load to re-fire the event, silently losing it. Fixed by moving the capture to module scope in `useInstallPrompt.js`, shared across every component that calls the hook regardless of which screen is mounted when the event actually fires.
+
 ---
 
 ## Dev environment data reset (2026-08-20)
