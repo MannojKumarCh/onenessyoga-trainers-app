@@ -251,6 +251,8 @@ Wired into two places: `TopicSelect.jsx` shows a 28px thumbnail next to each dro
 
 Verified: `npm run build` clean, all 45 manifest slugs cross-checked 1:1 against files on disk, `vite preview` HTTP-served a sample of the images successfully.
 
+**Follow-up** (commit `8f99129`): thumbnails extended to every place a sequence/session is listed, not just the picker/detail page — a new shared `SessionThumb` component (wraps `getSessionImageUrl`, renders nothing if unmapped) was added to all three Sequences list pages, all three Sessions views (admin list, trainer's My Sessions, Completed Sessions' table), both roles' dashboard "today's sessions" cards, and the session detail hero image. Also switched Admin's "Session Type" field from a free-text `<input>` (defaulting to the untracked string `"BKP"`) to the same `TopicSelect` dropdown sequences use, so newly-created sessions actually store a topic the thumbnail map recognizes — existing/`"BKP"` sessions simply show no thumbnail, same graceful fallback as any unmapped topic.
+
 ---
 
 ## Environment variables reference
