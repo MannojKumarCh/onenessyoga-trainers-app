@@ -285,6 +285,14 @@ Verified: `npm run build` clean, all 45 manifest slugs cross-checked 1:1 against
 
 ---
 
+## Dev environment data reset (2026-08-20)
+
+Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).
+
+All 4 dev accounts (`admin@oneness.yoga` / super_admin, `devseqcre@guysmail.com` / sequence_creator+trainer, `devtrainer1@clowmail.com` / trainer, `saieleuri@gmail.com` / trainer) had their passwords rotated to a shared known value so the user could log in and test each role — the actual password was shared directly with the user, not recorded here.
+
+---
+
 ## Known gaps / not yet done
 
 1. **Action needed from user**: downgrade the trainer accounts currently shared as Editor on the `GOOGLE_SEQUENCES_FOLDER_ID` Drive folder to Viewer (or remove them) — our code-level read-only restriction can't take effect until the folder-level permissions stop overriding it (see §5).
