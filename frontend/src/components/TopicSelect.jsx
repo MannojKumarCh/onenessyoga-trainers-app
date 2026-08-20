@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { MagnifyingGlassIcon, ChevronDownIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { getSessionImageUrl } from '../config/sessionImages';
 
 const TOPIC_GROUPS = [
   {
@@ -240,13 +241,21 @@ export default function TopicSelect({ value, onChange, id, required }) {
           paddingRight: value ? 8 : 12,
         }}
       >
-        <span style={{
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          flex: 1,
-        }}>
-          {displayValue || 'Select topic…'}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, overflow: 'hidden' }}>
+          {value && getSessionImageUrl(value) && (
+            <img
+              src={getSessionImageUrl(value)}
+              alt=""
+              style={{ width: 24, height: 24, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }}
+            />
+          )}
+          <span style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            {displayValue || 'Select topic…'}
+          </span>
         </span>
 
         <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
@@ -403,6 +412,7 @@ export default function TopicSelect({ value, onChange, id, required }) {
                       const isSelected = value === topic;
                       const flatIdx = flatVisible.indexOf(topic);
                       const isHighlighted = flatIdx === highlightIdx;
+                      const imageUrl = getSessionImageUrl(topic);
                       return (
                         <div
                           key={topic}
@@ -426,6 +436,13 @@ export default function TopicSelect({ value, onChange, id, required }) {
                             transition: 'background 0.1s',
                           }}
                         >
+                          {imageUrl && (
+                            <img
+                              src={imageUrl}
+                              alt=""
+                              style={{ width: 28, height: 28, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }}
+                            />
+                          )}
                           <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {topic}
                           </span>

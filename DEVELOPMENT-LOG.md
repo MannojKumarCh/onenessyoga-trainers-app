@@ -241,6 +241,18 @@ Verified directly against the local backend: a user promoted to `roles: ['traine
 
 ---
 
+## 11. Session-type images in the topic picker and sequence detail
+
+The user supplied 45 AI-generated poster images (one per session/topic, dropped into a local `Sequences Images/` folder — not committed, listed in `.gitignore` since originals average ~2.6MB each at 2048×2048). Each was visually inspected, matched against the real topic list in `frontend/src/components/TopicSelect.jsx` (not the narrower 32-item catalog used by the AI scheduler in §9 — that was an initial false start, corrected after discovering `TopicSelect.jsx`'s ~60-entry `TOPIC_GROUPS` is what's actually used app-wide), and renamed to match. One image's baked-in text was wrong ("Yoga - Stretching" on what was actually meant to be the Strengthening poster) — fixed in-place with a Python/Pillow script that repaints the text region using the surrounding gradient color (sampled per-row, since the background is a vertical-only gradient) and redraws the correct text. `Holiday.png` (generic, no specific holiday) is duplicated for both "Festival Holiday" and "National Holiday".
+
+All 45 were resized (max 480px) and re-encoded as JPEG (~10-25KB each, down from ~2.6MB) into `frontend/public/session-images/<slug>.jpg` — using `.jpg` deliberately, since the service worker's precache glob (`vite.config.js`) only matches `png`, keeping these out of the PWA's install-time precache (loaded on-demand instead, appropriate since a user rarely views more than a few topics per session). `frontend/src/config/sessionImages.js` maps each exact topic string to its slug; `getSessionImageUrl(topic)` returns `null` for topics without an image (not every topic in `TOPIC_GROUPS` has one).
+
+Wired into two places: `TopicSelect.jsx` shows a 28px thumbnail next to each dropdown option and a 24px thumbnail in the trigger once a topic is selected; the shared `SequenceDetail.jsx` (used by all three roles) shows a full-width hero image above the topic heading when one exists.
+
+Verified: `npm run build` clean, all 45 manifest slugs cross-checked 1:1 against files on disk, `vite preview` HTTP-served a sample of the images successfully.
+
+---
+
 ## Environment variables reference
 
 **`backend/.env`**:

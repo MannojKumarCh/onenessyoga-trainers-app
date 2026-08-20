@@ -8,6 +8,7 @@ import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, ArrowLeftIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
+import { getSessionImageUrl } from '../../config/sessionImages';
 
 const EMPTY_ITEM = { name: '', remarks: '', reference_url: '' };
 
@@ -155,6 +156,13 @@ export default function SequenceDetail() {
         <ArrowLeftIcon style={{ width: 18, height: 18 }} /> Back
       </button>
 
+      {getSessionImageUrl(seq.topic) && (
+        <img
+          src={getSessionImageUrl(seq.topic)}
+          alt=""
+          style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: 16 }}
+        />
+      )}
       <h1 style={{ fontSize: 22, fontWeight: 700 }}>{seq.topic}</h1>
       <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 4 }}>{format(new Date(seq.scheduled_date), 'EEEE, d MMMM yyyy')}</p>
 

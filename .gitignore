@@ -20,3 +20,7 @@ backend/prisma/generated/
 
 # Private local deploy helpers - never commit (may contain VM access details)
 deploy/_*
+
+# Raw source images (large originals) - optimized copies live in frontend/public/session-images
+Session Images/
+Sequences Images/
