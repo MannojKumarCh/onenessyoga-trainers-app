@@ -47,7 +47,7 @@ router.post('/', authenticate, requireRole('trainer'), async (req, res) => {
     data: { trainer_id: req.user.id, from_date, to_date, reason: reason.trim() }
   });
 
-  const admins = await prisma.user.findMany({ where: { role: 'super_admin', is_active: true }, select: { id: true } });
+  const admins = await prisma.user.findMany({ where: { roles: { has: 'super_admin' }, is_active: true }, select: { id: true } });
   if (admins.length > 0) {
     notifyUsers(admins.map(a => a.id), {
       title: 'New Leave Application',

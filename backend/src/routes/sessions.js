@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const prisma = require('../db/db');
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requireRole, getUserRoles } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const { notifyUser } = require('../utils/notify');
 const validateIdParam = require('../middleware/validateIdParam');
@@ -32,10 +32,10 @@ async function ensureTrainerExists(trainerId) {
 
   const trainer = await prisma.user.findUnique({
     where: { id: trainerId },
-    select: { id: true, role: true }
+    select: { id: true, roles: true }
   });
 
-  if (!trainer || trainer.role !== 'trainer') {
+  if (!trainer || !trainer.roles.includes('trainer')) {
     throw httpError(400, 'assigned_trainer_id must reference an existing trainer');
   }
 
@@ -104,7 +104,12 @@ router.get('/:id', authenticate, async (req, res) => {
     include: { assigned_trainer: { select: { name: true, zoom_link: true } } }
   });
   if (!session) return res.status(404).json({ error: 'Session not found' });
-  if (req.user.role === 'trainer' && session.assigned_trainer_id !== req.user.id) {
+  // Trainer-only viewers are restricted to their own sessions; anyone who also
+  // holds a broader role (admin/creator) can already see every session, so the
+  // restriction only applies when trainer is their sole relevant role.
+  const roles = getUserRoles(req.user);
+  const isTrainerOnly = roles.includes('trainer') && !roles.includes('super_admin') && !roles.includes('sequence_creator');
+  if (isTrainerOnly && session.assigned_trainer_id !== req.user.id) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   res.json(serializeWithZoom(session));
@@ -149,7 +154,7 @@ router.post('/bulk', authenticate, requireRole('super_admin'), async (req, res) 
   const uniqueTrainerIds = [...new Set(trainerIds.filter(id => id !== null))];
 
   const trainers = await prisma.user.findMany({
-    where: { id: { in: uniqueTrainerIds }, role: 'trainer' },
+    where: { id: { in: uniqueTrainerIds }, roles: { has: 'trainer' } },
     select: { id: true }
   });
   if (trainers.length !== uniqueTrainerIds.length) {
@@ -219,7 +224,7 @@ router.patch('/:id/complete', authenticate, requireRole('trainer'), async (req, 
     data: { is_completed: true, completed_at: new Date(), notes: notes ?? session.notes }
   });
 
-  const admins = await prisma.user.findMany({ where: { role: 'super_admin', is_active: true }, select: { id: true } });
+  const admins = await prisma.user.findMany({ where: { roles: { has: 'super_admin' }, is_active: true }, select: { id: true } });
   if (admins.length > 0) {
     notifyUsers(admins.map(a => a.id), {
       title: 'Session Completed',
@@ -241,7 +246,7 @@ router.patch('/:id/notes', authenticate, requireRole('trainer'), async (req, res
 
   await prisma.session.update({ where: { id }, data: { notes } });
 
-  const admins = await prisma.user.findMany({ where: { role: 'super_admin', is_active: true }, select: { id: true } });
+  const admins = await prisma.user.findMany({ where: { roles: { has: 'super_admin' }, is_active: true }, select: { id: true } });
   if (admins.length > 0) {
     notifyUsers(admins.map(a => a.id), {
       title: 'Session Notes Added',

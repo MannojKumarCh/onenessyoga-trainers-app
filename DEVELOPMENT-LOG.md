@@ -225,6 +225,22 @@ Verified directly against the real backend (happy path, atomic rejection on an i
 
 ---
 
+## 10. Multi-role support — a user can hold any combination of the 3 roles
+
+Previously `User.role` was a single scalar (`super_admin` | `sequence_creator` | `trainer`), so a person who was e.g. both a Trainer and a Sequence Creator needed two separate accounts and could only ever see one set of screens per login. This replaces the single scalar with `User.roles Role[]` and merges routing/nav so one login shows the union of every role's screens.
+
+**Migration** (`20260820111315_add_multi_role_support`, non-destructive): added `roles` column, backfilled each row from its old `role` value (`ARRAY["role"]::"Role"[]`), then dropped `role`. Verified locally that every existing user's `roles` array matched their prior single role exactly before/after.
+
+**Backend**: JWT payload and all API responses now carry `roles: [...]` instead of `role`. `requireRole(...allowed)` in `backend/src/middleware/auth.js` now checks whether the user's role set intersects the route's allow-list, via a new shared `getUserRoles()` helper. Every `where: { role: 'trainer' }`-style filter (trainer dropdowns, admin-notify lists, Google Sheet trainer-share list) became `where: { roles: { has: 'trainer' } }`. Inline role-conditional business logic was re-derived carefully rather than blindly swapped to `.includes()` — notably: the sequence-creator backdating guard (§9) still exempts anyone who *also* holds `super_admin`, and the trainer-only session-detail ownership restriction only applies when trainer is a user's *sole* relevant role (someone who's also `sequence_creator` or `super_admin` isn't newly locked out of sessions they could already see).
+
+**Rollout safety**: real users had live 7-day JWTs in the old `{ role: '...' }` shape at deploy time. `getUserRoles()` falls back to treating a singular `role` claim as a 1-element array, so already-issued tokens keep working without forcing anyone to re-login. This fallback is temporary — `// TODO(remove after 2026-08-27)` markers are in `middleware/auth.js`, safe to delete once every pre-migration token has expired.
+
+**Frontend**: the three separate layouts (`AdminLayout`, `TrainerLayout`, `SequenceCreatorLayout`) were replaced with one `AppLayout`. `App.jsx` builds its route tree by merging each active role's routes in a fixed precedence (`trainer` → `sequence_creator` → `super_admin`, later wins on a path collision — e.g. Admin's full-CRUD `/sequences` wins over Trainer's read-only version for any admin combination); `AppLayout`'s bottom nav is merged the same way via `frontend/src/config/nav.js`, and the header shows all active role labels joined with " + ". Admin's user create/edit form (`Trainers.jsx`) now uses checkboxes instead of a single role `<select>`.
+
+Verified directly against the local backend: a user promoted to `roles: ['trainer', 'sequence_creator']` passed both a trainer-gated and a sequence_creator-gated endpoint on the same token, appeared in the trainer dropdown, and was still correctly rejected for backdating; a `super_admin` + `sequence_creator` combo user was correctly exempted from the backdating guard; a manually-signed old-shape token (`role: 'trainer'`, no `roles`) still authenticated successfully via the fallback. Frontend `npm run build` is clean with zero remaining `.role` references. **Not yet verified**: live browser/DOM click-through of the merged nav for a multi-role account (Playwright unavailable in-session, consistent with prior attempts — see §9's known gaps).
+
+---
+
 ## Environment variables reference
 
 **`backend/.env`**:
@@ -264,3 +280,4 @@ Verified directly against the real backend (happy path, atomic rejection on an i
 5. ~~DNS, dev Google Drive folder, OAuth Console origins~~ — **done** (see §8). Both `trainers.onenessyoga.in` and `tdev.onenessyoga.in` are live over HTTPS. Still open: no browser-level verification yet (PWA/push/Google Sign-In), no prod admin account seeded.
 6. ~~Add `OPENROUTER_API_KEY`~~ — **done**, key is live on dev, real generations working (see §9). Sequence Creator can now also turn a generated plan directly into real sequences (`POST /sequences/bulk`). Still open: a live browser/DOM click-through of the editable AI-plan modal (Playwright unavailable in-session throughout), and validating `google/gemma-4-31b-it:free`'s real output quality specifically (blocked by transient free-tier provider throttling at time of writing — `nvidia/nemotron-3-ultra-550b-a55b:free` is currently configured instead, already validated).
 7. **Not started**: prod deployment of everything in §9 (AI scheduler + bulk-create) — `main` branch is behind `dev` and prod has intentionally not been touched since dev-first verification began (see §8).
+8. **Not started**: prod deployment of multi-role support (§10) — dev only so far, per the same dev-first policy. **Not yet verified**: live browser/DOM check of the merged nav for a multi-role account (Playwright unavailable in-session).

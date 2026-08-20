@@ -15,10 +15,19 @@ const validateIdParam = require('../middleware/validateIdParam');
 
 router.param('id', validateIdParam);
 
+const VALID_ROLES = ['super_admin', 'sequence_creator', 'trainer'];
+
+function validateRoles(roles) {
+  if (!Array.isArray(roles) || roles.length === 0) return 'roles must be a non-empty array';
+  if (!roles.every(r => VALID_ROLES.includes(r))) return 'Invalid role';
+  if (new Set(roles).size !== roles.length) return 'roles must not contain duplicates';
+  return null;
+}
+
 // Admin: list all trainers
 router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, role: true, zoom_link: true, is_active: true, google_link_status: true, created_at: true },
+    select: { id: true, name: true, email: true, roles: true, zoom_link: true, is_active: true, google_link_status: true, created_at: true },
     orderBy: { name: 'asc' }
   });
   res.json(users);
@@ -26,9 +35,10 @@ router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
 
 // Admin: create user
 router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
-  const { name, email, password, role, zoom_link } = req.body;
-  if (!name || !email || !password || !role) return res.status(400).json({ error: 'name, email, password, role required' });
-  if (!['super_admin', 'sequence_creator', 'trainer'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+  const { name, email, password, roles, zoom_link } = req.body;
+  if (!name || !email || !password || !roles) return res.status(400).json({ error: 'name, email, password, roles required' });
+  const rolesError = validateRoles(roles);
+  if (rolesError) return res.status(400).json({ error: rolesError });
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
   const normalizedEmail = email.toLowerCase().trim();
@@ -37,7 +47,7 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
 
   const hash = await bcrypt.hash(password, 10);
   const user = await prisma.user.create({
-    data: { name: name.trim(), email: normalizedEmail, password_hash: hash, role, zoom_link: zoom_link || null }
+    data: { name: name.trim(), email: normalizedEmail, password_hash: hash, roles, zoom_link: zoom_link || null }
   });
 
   await sendWelcomeEmail(user).catch(err => console.error('Failed to send welcome email:', err));
@@ -47,17 +57,22 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
 
 // Admin: update user
 router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) => {
-  const { name, email, role, zoom_link, is_active } = req.body;
+  const { name, email, roles, zoom_link, is_active } = req.body;
   const id = parseInt(req.params.id);
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return res.status(404).json({ error: 'User not found' });
+
+  if (roles !== undefined) {
+    const rolesError = validateRoles(roles);
+    if (rolesError) return res.status(400).json({ error: rolesError });
+  }
 
   await prisma.user.update({
     where: { id },
     data: {
       name: name ?? user.name,
       email: email ?? user.email,
-      role: role ?? user.role,
+      roles: roles ?? user.roles,
       zoom_link: zoom_link ?? user.zoom_link,
       is_active: is_active !== undefined ? Boolean(is_active) : user.is_active
     }
@@ -133,7 +148,7 @@ router.delete('/:id', authenticate, requireRole('super_admin'), async (req, res)
 // All roles: list trainers only (for dropdowns)
 router.get('/trainers', authenticate, async (req, res) => {
   const trainers = await prisma.user.findMany({
-    where: { role: 'trainer', is_active: true },
+    where: { roles: { has: 'trainer' }, is_active: true },
     select: { id: true, name: true, email: true, zoom_link: true },
     orderBy: { name: 'asc' }
   });

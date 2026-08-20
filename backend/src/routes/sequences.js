@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const rateLimit = require('express-rate-limit');
 const prisma = require('../db/db');
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate, requireRole, getUserRoles } = require('../middleware/auth');
 const { notifyUser, notifyAll } = require('../utils/notify');
 const asyncHandler = require('../utils/asyncHandler');
 const { upsertSequenceInSheet } = require('../utils/sheets');
@@ -45,10 +45,10 @@ function parseOptionalPositiveInt(value, fieldName) {
 async function ensureTrainerExists(trainerId) {
   const trainer = await prisma.user.findUnique({
     where: { id: trainerId },
-    select: { id: true, role: true }
+    select: { id: true, roles: true }
   });
 
-  if (!trainer || trainer.role !== 'trainer') {
+  if (!trainer || !trainer.roles.includes('trainer')) {
     throw httpError(400, 'assigned_trainer_id must reference an existing trainer');
   }
 }
@@ -133,7 +133,12 @@ router.post('/', authenticate, requireRole('super_admin', 'sequence_creator'), a
   if (!week_start_date || !scheduled_date || !topic) {
     throw httpError(400, 'week_start_date, scheduled_date, and topic are required');
   }
-  if (req.user.role === 'sequence_creator') assertNotBackdated(scheduled_date);
+  // Super Admin is exempt from the backdating guard even if they also hold
+  // sequence_creator (e.g. for corrections/backfill).
+  const creatorRoles = getUserRoles(req.user);
+  if (creatorRoles.includes('sequence_creator') && !creatorRoles.includes('super_admin')) {
+    assertNotBackdated(scheduled_date);
+  }
 
   const trainerId = parsePositiveInt(assigned_trainer_id, 'assigned_trainer_id');
   const trimmedTopic = String(topic).trim();
@@ -169,19 +174,20 @@ router.post('/bulk', authenticate, requireRole('sequence_creator'), async (req, 
   const uniqueTrainerIds = [...new Set(trainerIds)];
 
   const trainers = await prisma.user.findMany({
-    where: { id: { in: uniqueTrainerIds }, role: 'trainer' },
+    where: { id: { in: uniqueTrainerIds }, roles: { has: 'trainer' } },
     select: { id: true }
   });
   if (trainers.length !== uniqueTrainerIds.length) {
     throw httpError(400, 'assigned_trainer_id must reference an existing trainer');
   }
 
+  const bulkIsSuperAdmin = getUserRoles(req.user).includes('super_admin');
   const data = sequences.map((s, i) => {
     const trimmedTopic = String(s.topic || '').trim();
     if (!s.scheduled_date || !trimmedTopic) {
       throw httpError(400, `sequences[${i}]: scheduled_date and topic are required`);
     }
-    assertNotBackdated(s.scheduled_date);
+    if (!bulkIsSuperAdmin) assertNotBackdated(s.scheduled_date);
     return {
       week_start_date,
       scheduled_date: s.scheduled_date,

@@ -38,7 +38,7 @@ export default function AdminDashboard() {
       client.get('/leaves?status=pending'),
       client.get(`/sessions?from=${todayStr}&to=${todayStr}`),
     ]).then(([users, leaves, sessions]) => {
-      const trainersCount = users.data.filter(u => u.role === 'trainer' && u.is_active).length;
+      const trainersCount = users.data.filter(u => u.roles.includes('trainer') && u.is_active).length;
       setPendingLeavesList(leaves.data);
       setTodaySessionsList(sessions.data);
       setStats({

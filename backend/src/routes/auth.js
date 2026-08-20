@@ -38,14 +38,14 @@ router.post('/login', loginLimiter, async (req, res) => {
   if (!valid) return res.status(401).json({ error: 'Incorrect password. Please check and try again' });
 
   const token = jwt.sign(
-    { id: user.id, name: user.name, email: user.email, role: user.role },
+    { id: user.id, name: user.name, email: user.email, roles: user.roles },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
 
   res.json({
     token,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role, zoom_link: user.zoom_link }
+    user: { id: user.id, name: user.name, email: user.email, roles: user.roles, zoom_link: user.zoom_link }
   });
 });
 
@@ -81,7 +81,7 @@ router.post('/google', loginLimiter, async (req, res) => {
     });
 
     const admins = await prisma.user.findMany({
-      where: { role: 'super_admin', is_active: true },
+      where: { roles: { has: 'super_admin' }, is_active: true },
       select: { id: true, name: true, email: true }
     });
 
@@ -113,21 +113,21 @@ router.post('/google', loginLimiter, async (req, res) => {
 
   // approved
   const token = jwt.sign(
-    { id: user.id, name: user.name, email: user.email, role: user.role },
+    { id: user.id, name: user.name, email: user.email, roles: user.roles },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
   );
 
   res.json({
     token,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role, zoom_link: user.zoom_link }
+    user: { id: user.id, name: user.name, email: user.email, roles: user.roles, zoom_link: user.zoom_link }
   });
 });
 
 router.get('/me', authenticate, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    select: { id: true, name: true, email: true, role: true, zoom_link: true, created_at: true }
+    select: { id: true, name: true, email: true, roles: true, zoom_link: true, created_at: true }
   });
   res.json(user);
 });

@@ -79,7 +79,7 @@ async function findOrCreateMonthlySheet(year_month, scheduled_date) {
   const spreadsheetId = createResp.data.id;
 
   const approvedTrainers = await prisma.user.findMany({
-    where: { role: 'trainer', google_link_status: 'approved' },
+    where: { roles: { has: 'trainer' }, google_link_status: 'approved' },
     select: { email: true }
   });
 

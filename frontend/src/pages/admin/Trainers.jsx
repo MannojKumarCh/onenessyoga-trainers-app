@@ -5,11 +5,13 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import PasswordInput from '../../components/PasswordInput';
 import { useAuth } from '../../context/AuthContext';
 import { getApiErrorMessage } from '../../utils/apiError';
+import { formatRole } from '../../utils/formatRole';
 import { ExclamationTriangleIcon, PlusIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 
-const EMPTY = { name: '', email: '', password: '', role: 'trainer', zoom_link: '' };
+const ROLE_OPTIONS = ['trainer', 'sequence_creator', 'super_admin'];
+const EMPTY = { name: '', email: '', password: '', roles: ['trainer'], zoom_link: '' };
 
 export default function AdminTrainers() {
   const { user: currentUser } = useAuth();
@@ -42,7 +44,7 @@ export default function AdminTrainers() {
   function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setShowForm(true); }
   function openEdit(u) {
     setEditing(u);
-    setForm({ name: u.name, email: u.email, password: '', role: u.role, zoom_link: u.zoom_link || '' });
+    setForm({ name: u.name, email: u.email, password: '', roles: u.roles, zoom_link: u.zoom_link || '' });
     setError('');
     setShowForm(true);
   }
@@ -53,7 +55,7 @@ export default function AdminTrainers() {
     setSubmitting(true);
     try {
       if (editing) {
-        await client.put(`/users/${editing.id}`, { name: form.name, email: form.email, role: form.role, zoom_link: form.zoom_link });
+        await client.put(`/users/${editing.id}`, { name: form.name, email: form.email, roles: form.roles, zoom_link: form.zoom_link });
       } else {
         await client.post('/users', form);
       }
@@ -143,7 +145,7 @@ export default function AdminTrainers() {
               {u.google_link_status === 'approved' && <span className="badge badge-approved">Google: Linked</span>}
               {u.google_link_status === 'rejected' && <span className="badge badge-rejected">Google: Rejected</span>}
             </div>
-            <div className="list-item-sub">{u.email} · {u.role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</div>
+            <div className="list-item-sub">{u.email} · {u.roles.map(formatRole).join(', ')}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {u.google_link_status === 'pending' && (
@@ -195,12 +197,22 @@ export default function AdminTrainers() {
                 </div>
               )}
               <div className="form-group">
-                <label className="label" htmlFor="trainer-role">Role</label>
-                <select id="trainer-role" className="input" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
-                  <option value="trainer">Trainer</option>
-                  <option value="sequence_creator">Sequence Creator</option>
-                  <option value="super_admin">Super Admin</option>
-                </select>
+                <label className="label">Roles</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {ROLE_OPTIONS.map(r => (
+                    <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+                      <input
+                        type="checkbox"
+                        checked={form.roles.includes(r)}
+                        onChange={e => setForm(f => ({
+                          ...f,
+                          roles: e.target.checked ? [...f.roles, r] : f.roles.filter(x => x !== r)
+                        }))}
+                      />
+                      {formatRole(r)}
+                    </label>
+                  ))}
+                </div>
               </div>
               <div className="form-group">
                 <label className="label" htmlFor="trainer-zoom">Zoom Link</label>
@@ -209,7 +221,7 @@ export default function AdminTrainers() {
               {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowForm(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={submitting}>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={submitting || form.roles.length === 0}>
                   {submitting ? 'Saving…' : 'Save'}
                 </button>
               </div>

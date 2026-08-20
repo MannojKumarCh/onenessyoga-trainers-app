@@ -3,8 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import LoginPage from './pages/LoginPage';
-import TrainerLayout from './components/TrainerLayout';
-import AdminLayout from './components/AdminLayout';
+import AppLayout from './components/AppLayout';
 import Dashboard from './pages/trainer/Dashboard';
 import MySessions from './pages/trainer/MySessions';
 import SessionDetail from './pages/trainer/SessionDetail';
@@ -19,9 +18,56 @@ import AdminSessions from './pages/admin/Sessions';
 import AdminLeaves from './pages/admin/Leaves';
 import AdminSequences from './pages/admin/Sequences';
 import AdminResources from './pages/admin/Resources';
-import SequenceCreatorLayout from './components/SequenceCreatorLayout';
 import CreatorSequences from './pages/sequence-creator/Sequences';
 import Notifications from './pages/Notifications';
+
+// Precedence when a user has multiple roles: later roles' pages win on a
+// path collision (e.g. both Admin and Trainer have a 'sequences' page).
+const ROLE_PRECEDENCE = ['trainer', 'sequence_creator', 'super_admin'];
+
+const ROUTES_BY_ROLE = {
+  trainer: [
+    { path: '', element: <Dashboard /> },
+    { path: 'sessions', element: <MySessions /> },
+    { path: 'sessions/:id', element: <SessionDetail /> },
+    { path: 'completed', element: <CompletedSessions /> },
+    { path: 'leaves', element: <Leaves /> },
+    { path: 'sequences', element: <Sequences /> },
+    { path: 'sequences/:id', element: <SequenceDetail /> },
+    { path: 'resources', element: <Resources /> }
+  ],
+  // No '' entry: a pure Sequence Creator's home falls back to their
+  // 'sequences' page (see buildRoutes below), matching the prior behavior
+  // where CreatorSequences was both the index and the /sequences page.
+  sequence_creator: [
+    { path: 'sequences', element: <CreatorSequences /> },
+    { path: 'sequences/:id', element: <SequenceDetail /> }
+  ],
+  super_admin: [
+    { path: '', element: <AdminDashboard /> },
+    { path: 'trainers', element: <AdminTrainers /> },
+    { path: 'sessions', element: <AdminSessions /> },
+    { path: 'leaves', element: <AdminLeaves /> },
+    { path: 'sequences', element: <AdminSequences /> },
+    { path: 'sequences/:id', element: <SequenceDetail /> },
+    { path: 'resources', element: <AdminResources /> }
+  ]
+};
+
+// Merges each active role's pages, in precedence order, so a user with
+// multiple roles gets the union of every page they're entitled to (with the
+// higher-privilege version winning any path collision).
+function buildRoutes(roles) {
+  const merged = new Map();
+  for (const role of ROLE_PRECEDENCE) {
+    if (!roles.includes(role)) continue;
+    for (const route of ROUTES_BY_ROLE[role]) {
+      merged.set(route.path, route.element);
+    }
+  }
+  const indexElement = merged.get('') ?? merged.get('sequences');
+  return { merged, indexElement };
+}
 
 function usePageTitle() {
   const { pathname } = useLocation();
@@ -65,49 +111,15 @@ function AppRoutes() {
 
   if (!user) return <Routes><Route path="*" element={<LoginPage />} /></Routes>;
 
-  if (user.role === 'super_admin') {
-    return (
-      <Routes>
-        <Route path="/" element={<AdminLayout />}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="trainers" element={<AdminTrainers />} />
-          <Route path="sessions" element={<AdminSessions />} />
-          <Route path="leaves" element={<AdminLeaves />} />
-          <Route path="sequences" element={<AdminSequences />} />
-          <Route path="sequences/:id" element={<SequenceDetail />} />
-          <Route path="resources" element={<AdminResources />} />
-          <Route path="notifications" element={<Notifications />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    );
-  }
-
-  if (user.role === 'sequence_creator') {
-    return (
-      <Routes>
-        <Route path="/" element={<SequenceCreatorLayout />}>
-          <Route index element={<CreatorSequences />} />
-          <Route path="sequences" element={<CreatorSequences />} />
-          <Route path="sequences/:id" element={<SequenceDetail />} />
-          <Route path="notifications" element={<Notifications />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    );
-  }
+  const { merged, indexElement } = buildRoutes(user.roles);
 
   return (
     <Routes>
-      <Route path="/" element={<TrainerLayout />}>
-        <Route index element={<Dashboard />} />
-        <Route path="sessions" element={<MySessions />} />
-        <Route path="sessions/:id" element={<SessionDetail />} />
-        <Route path="completed" element={<CompletedSessions />} />
-        <Route path="leaves" element={<Leaves />} />
-        <Route path="sequences" element={<Sequences />} />
-        <Route path="sequences/:id" element={<SequenceDetail />} />
-        <Route path="resources" element={<Resources />} />
+      <Route path="/" element={<AppLayout />}>
+        <Route index element={indexElement} />
+        {[...merged.entries()].filter(([path]) => path !== '').map(([path, element]) => (
+          <Route key={path} path={path} element={element} />
+        ))}
         <Route path="notifications" element={<Notifications />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

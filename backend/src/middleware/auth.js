@@ -14,13 +14,21 @@ function authenticate(req, res, next) {
   }
 }
 
-function requireRole(...roles) {
+// TODO(remove after 2026-08-27): pre-migration JWTs (signed before multi-role
+// support) carry a singular `role` string instead of a `roles` array. This
+// fallback keeps those already-issued 7-day tokens working until they expire.
+function getUserRoles(reqUser) {
+  return reqUser.roles || (reqUser.role ? [reqUser.role] : []);
+}
+
+function requireRole(...allowed) {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    const userRoles = getUserRoles(req.user);
+    if (!allowed.some(r => userRoles.includes(r))) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     next();
   };
 }
 
-module.exports = { authenticate, requireRole };
+module.exports = { authenticate, requireRole, getUserRoles };
