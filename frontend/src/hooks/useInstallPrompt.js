@@ -8,47 +8,59 @@ function isIos() {
   return /iphone|ipad|ipod/i.test(window.navigator.userAgent) && !window.MSStream;
 }
 
-// Wraps the browser's install-to-home-screen flow (Chrome/Edge/Android fire
-// `beforeinstallprompt`; we capture it once and replay it on demand instead
-// of letting the browser show its own mini-infobar). iOS Safari never fires
-// that event - there is no programmatic install API there, only the
-// Share -> "Add to Home Screen" menu, so we surface `needsManualIosSteps`
-// instead so the UI can show instructions rather than a broken button.
+// `beforeinstallprompt` fires at most once per page load, whenever Chrome
+// finishes deciding the app is installable - which can happen before any
+// particular component (e.g. the login page) has even mounted, or while a
+// totally different screen is showing. Capturing it into per-component state
+// loses it the moment that component unmounts (this is a single-page app -
+// logging in unmounts the login page and mounts the dashboard fresh, with no
+// new page load to re-fire the event). So the capture lives at module scope,
+// shared by every component that calls the hook, however many times it's
+// called and on whichever screen happens to be mounted when it fires.
+let capturedEvent = null;
+let installedGlobally = typeof window !== 'undefined' && isStandalone();
+const listeners = new Set();
+
+function notify() {
+  listeners.forEach(fn => fn());
+}
+
+if (typeof window !== 'undefined' && !installedGlobally) {
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    capturedEvent = e;
+    notify();
+  });
+  window.addEventListener('appinstalled', () => {
+    installedGlobally = true;
+    capturedEvent = null;
+    notify();
+  });
+}
+
 export function useInstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [installed, setInstalled] = useState(() => isStandalone());
+  const [, forceRender] = useState(0);
 
   useEffect(() => {
-    if (installed) return;
-
-    function onBeforeInstallPrompt(e) {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    }
-    function onAppInstalled() {
-      setInstalled(true);
-      setDeferredPrompt(null);
-    }
-    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-    window.addEventListener('appinstalled', onAppInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', onAppInstalled);
-    };
-  }, [installed]);
+    const onChange = () => forceRender(n => n + 1);
+    listeners.add(onChange);
+    return () => listeners.delete(onChange);
+  }, []);
 
   const promptInstall = useCallback(async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') setInstalled(true);
-    setDeferredPrompt(null);
-  }, [deferredPrompt]);
+    if (!capturedEvent) return;
+    const event = capturedEvent;
+    event.prompt();
+    const { outcome } = await event.userChoice;
+    if (outcome === 'accepted') installedGlobally = true;
+    capturedEvent = null;
+    notify();
+  }, []);
 
   return {
-    installed,
-    canInstall: !installed && !!deferredPrompt,
-    needsManualIosSteps: !installed && !deferredPrompt && isIos(),
+    installed: installedGlobally,
+    canInstall: !installedGlobally && !!capturedEvent,
+    needsManualIosSteps: !installedGlobally && !capturedEvent && isIos(),
     promptInstall
   };
 }
