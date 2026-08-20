@@ -8,6 +8,7 @@ import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, QueueListIcon, PlusIcon } from '@heroicons/react/24/outline';
 import TopicSelect from '../../components/TopicSelect';
 import SequenceFilters from '../../components/SequenceFilters';
+import SessionThumb from '../../components/SessionThumb';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 
@@ -176,6 +177,7 @@ export default function AdminSequences() {
         <div className="empty-state"><div style={{ display: 'flex', justifyContent: 'center', margin: '0 auto 12px' }}><QueueListIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div><p>{filtersActive ? 'No sequences match your filters' : 'No sequences this week'}</p></div>
       ) : sequences.map(seq => (
         <div key={seq.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sequences/${seq.id}`)}>
+          <SessionThumb topic={seq.topic} />
           <div className="list-item-left">
             <span style={{ fontSize: 11, fontWeight: 700, color: seq.status === 'uploaded' ? 'var(--success)' : 'var(--primary)', textTransform: 'uppercase' }}>{seq.status}</span>
             <div className="list-item-title">{seq.topic}</div>

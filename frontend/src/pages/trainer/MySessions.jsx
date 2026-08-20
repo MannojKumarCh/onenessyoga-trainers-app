@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { dayLabel, groupByDate } from '../../utils/date';
 import { ExclamationTriangleIcon, CalendarDaysIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import SessionThumb from '../../components/SessionThumb';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 
@@ -41,6 +42,7 @@ export default function MySessions() {
           <p className="section-title">{dayLabel(date, 'EEEE, d MMMM yyyy')}</p>
           {items.map(s => (
             <div key={s.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sessions/${s.id}`)}>
+              <SessionThumb topic={s.session_type} />
               <div className="list-item-left">
                 <div className="list-item-title">{s.title}</div>
                 <div className="list-item-sub">{s.scheduled_time} · {s.session_type}</div>

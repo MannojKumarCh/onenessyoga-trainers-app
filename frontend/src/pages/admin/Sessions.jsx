@@ -4,6 +4,8 @@ import { format } from 'date-fns';
 import { groupByDate } from '../../utils/date';
 import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import TopicSelect from '../../components/TopicSelect';
+import SessionThumb from '../../components/SessionThumb';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, CalendarDaysIcon, PlusIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
@@ -102,6 +104,7 @@ export default function AdminSessions() {
           <p className="section-title">{format(new Date(date), 'EEEE, d MMMM yyyy')}</p>
           {items.map(s => (
             <div key={s.id} className="list-item">
+              <SessionThumb topic={s.session_type} />
               <div className="list-item-left">
                 <div className="list-item-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {s.title} {s.is_completed && <span className="badge badge-approved">Done</span>}
@@ -133,7 +136,7 @@ export default function AdminSessions() {
               </div>
               <div className="form-group">
                 <label className="label" htmlFor="session-type">Session Type</label>
-                <input id="session-type" className="input" value={form.session_type} onChange={e => setForm(f => ({ ...f, session_type: e.target.value }))} placeholder="BKP" />
+                <TopicSelect id="session-type" value={form.session_type} onChange={v => setForm(f => ({ ...f, session_type: v }))} />
               </div>
               <div className="form-group">
                 <label className="label" htmlFor="session-trainer">Assign Trainer</label>

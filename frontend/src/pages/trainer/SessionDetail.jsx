@@ -7,6 +7,7 @@ import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, ArrowLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
+import { getSessionImageUrl } from '../../config/sessionImages';
 
 export default function SessionDetail() {
   const { id } = useParams();
@@ -67,6 +68,13 @@ export default function SessionDetail() {
       </button>
 
       <div style={{ marginBottom: 24 }}>
+        {getSessionImageUrl(session.session_type) && (
+          <img
+            src={getSessionImageUrl(session.session_type)}
+            alt=""
+            style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginBottom: 16 }}
+          />
+        )}
         <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
           {format(new Date(session.scheduled_date), 'EEEE, d MMMM yyyy')} · {session.scheduled_time}
         </p>

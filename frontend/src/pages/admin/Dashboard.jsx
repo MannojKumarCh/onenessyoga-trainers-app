@@ -6,6 +6,7 @@ import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 import { usePush } from '../../hooks/usePush';
 import { useAuth } from '../../context/AuthContext';
+import SessionThumb from '../../components/SessionThumb';
 import {
   ExclamationTriangleIcon,
   UsersIcon,
@@ -373,14 +374,17 @@ export default function AdminDashboard() {
                   gap: 12
                 }}
               >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{s.title}</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <ClockIcon style={{ width: 15, height: 15, color: 'var(--text-tertiary)', flexShrink: 0 }} />
-                      {s.scheduled_time}
-                    </span>
-                    <span>Trainer: <strong>{s.trainer_name || 'Unassigned'}</strong></span>
+                <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <SessionThumb topic={s.session_type} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{s.title}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <ClockIcon style={{ width: 15, height: 15, color: 'var(--text-tertiary)', flexShrink: 0 }} />
+                        {s.scheduled_time}
+                      </span>
+                      <span>Trainer: <strong>{s.trainer_name || 'Unassigned'}</strong></span>
+                    </div>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

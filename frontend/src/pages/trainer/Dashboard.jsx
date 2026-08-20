@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { dayLabel } from '../../utils/date';
 import { ExclamationTriangleIcon, SparklesIcon, CalendarDaysIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
+import SessionThumb from '../../components/SessionThumb';
 
 import { usePush } from '../../hooks/usePush';
 import { BellAlertIcon } from '@heroicons/react/24/outline';
@@ -187,6 +188,7 @@ export default function Dashboard() {
                 e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
               }}
             >
+              <SessionThumb topic={s.session_type} />
               <div className="list-item-left">
                 <div className="list-item-title" style={{ fontSize: 15, fontWeight: 700 }}>{s.title}</div>
                 <div className="list-item-sub" style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>

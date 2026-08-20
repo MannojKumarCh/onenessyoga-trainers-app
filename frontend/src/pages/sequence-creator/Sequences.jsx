@@ -6,6 +6,7 @@ import { ExclamationTriangleIcon, QueueListIcon, PlusIcon, SparklesIcon } from '
 import TopicSelect from '../../components/TopicSelect';
 import Modal from '../../components/Modal';
 import SequenceFilters from '../../components/SequenceFilters';
+import SessionThumb from '../../components/SessionThumb';
 import { getApiErrorMessage } from '../../utils/apiError';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
@@ -270,6 +271,7 @@ export default function CreatorSequences() {
         </div>
       ) : sequences.map(seq => (
         <div key={seq.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sequences/${seq.id}`)}>
+          <SessionThumb topic={seq.topic} />
           <div className="list-item-left">
             <span style={{ fontSize: 11, fontWeight: 700, color: seq.status === 'uploaded' ? 'var(--success)' : 'var(--primary)' }}>
               {seq.status ? seq.status.charAt(0).toUpperCase() + seq.status.slice(1) : ''}

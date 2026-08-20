@@ -3,6 +3,7 @@ import client from '../../api/client';
 import { format } from 'date-fns';
 import { groupByDate } from '../../utils/date';
 import { ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import SessionThumb from '../../components/SessionThumb';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 
@@ -49,7 +50,10 @@ export default function CompletedSessions() {
                 display: 'grid', gridTemplateColumns: '1fr 100px 1fr',
                 padding: '12px 14px', borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none'
               }}>
-                <span style={{ fontSize: 14, fontWeight: 500 }}>{s.trainer_name}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 500 }}>
+                  <SessionThumb topic={s.session_type} size={28} />
+                  {s.trainer_name}
+                </span>
                 <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{s.scheduled_time}</span>
                 <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{s.notes || '—'}</span>
               </div>

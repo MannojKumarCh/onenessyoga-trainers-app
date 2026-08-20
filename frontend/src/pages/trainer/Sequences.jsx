@@ -4,6 +4,7 @@ import client from '../../api/client';
 import { format } from 'date-fns';
 import { ExclamationTriangleIcon, QueueListIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import SequenceFilters from '../../components/SequenceFilters';
+import SessionThumb from '../../components/SessionThumb';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 
@@ -89,6 +90,7 @@ export default function Sequences() {
         </div>
       ) : sequences.map(seq => (
         <div key={seq.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sequences/${seq.id}`)}>
+          <SessionThumb topic={seq.topic} />
           <div className="list-item-left">
             <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase' }}>{seq.status}</span>
             <div className="list-item-title">{seq.topic}</div>
