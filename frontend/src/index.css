@@ -203,9 +203,11 @@ a:focus-visible, button:focus-visible, .list-item:focus-visible {
   box-shadow: var(--shadow-lg);
   animation: modalEnter 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-/* Wider variant for content-heavy modals (tables, multi-column forms) - still
-   just fills the available width on narrow/mobile screens via width:100%. */
-.modal--lg { max-width: 800px; }
+/* Wider variant for content-heavy modals (tables, multi-column forms) - scales
+   with the viewport up to a cap, so it grows further on larger monitors
+   instead of stopping at a flat width; still just fills the available width
+   on narrow/mobile screens via width:100% (min() never exceeds that either). */
+.modal--lg { max-width: min(92vw, 960px); }
 .modal-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; letter-spacing: -0.02em; }
 
 .tag { font-size: 12px; font-weight: 600; color: var(--primary); }
