@@ -297,6 +297,12 @@ iOS Safari never fires `beforeinstallprompt` - there is no programmatic install 
 
 ---
 
+## 13. Responsive width for content-heavy modals (commit `f0662a6`)
+
+The shared `Modal` component hard-capped every modal at `max-width: 480px`, which is right for simple single-field forms but squeezed the Build Sequence table (Exercise/Remarks/Reference columns) and the AI Schedule Suggestion review (per-day topic/trainer table) into the same cramped width even on a laptop. Added an opt-in `size="lg"` prop (`.modal--lg`, 800px max-width) used only by those two table-shaped modals; every other modal (Add Trainer, Add Session, leave forms, etc.) keeps the compact default. Mobile is unaffected either way, since `width: 100%` on `.modal` already caps it to the viewport regardless of the max-width ceiling.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).
