@@ -266,7 +266,7 @@ export default function SequenceDetail() {
       )}
 
       {showBuilder && (
-        <Modal title="Build Sequence" onClose={() => setShowBuilder(false)}>
+        <Modal title="Build Sequence" onClose={() => setShowBuilder(false)} size="lg">
           <form onSubmit={submitBuilder}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <span className="label" style={{ marginBottom: 0 }}>Sequence Items</span>

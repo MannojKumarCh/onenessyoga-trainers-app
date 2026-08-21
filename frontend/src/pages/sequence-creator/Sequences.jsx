@@ -322,7 +322,7 @@ export default function CreatorSequences() {
       )}
 
       {showAiSchedule && (
-        <Modal title="AI Schedule Suggestion" onClose={() => setShowAiSchedule(false)}>
+        <Modal title="AI Schedule Suggestion" onClose={() => setShowAiSchedule(false)} size="lg">
           {aiLoading ? (
             <div className="loading">Generating…</div>
           ) : aiError ? (

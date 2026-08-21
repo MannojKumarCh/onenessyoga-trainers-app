@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 
-export default function Modal({ title, onClose, children }) {
+export default function Modal({ title, onClose, children, size }) {
   const dialogRef = useRef(null);
   const triggerRef = useRef(document.activeElement);
 
@@ -31,7 +31,7 @@ export default function Modal({ title, onClose, children }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title} ref={dialogRef} onClick={e => e.stopPropagation()}>
+      <div className={`modal${size === 'lg' ? ' modal--lg' : ''}`} role="dialog" aria-modal="true" aria-label={title} ref={dialogRef} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <h3 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em' }}>{title}</h3>
           <button
