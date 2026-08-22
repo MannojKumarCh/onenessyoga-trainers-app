@@ -51,4 +51,26 @@ async function sendGoogleLinkDecisionEmail(user, status) {
   });
 }
 
-module.exports = { sendWelcomeEmail, sendGoogleLinkPendingEmail, sendGoogleLinkDecisionEmail };
+async function sendBackupAssignedEmail(recipient, session, { role, otherTrainerName }) {
+  if (!resend) {
+    console.warn('RESEND_API_KEY not configured — skipping backup-assignment email to', recipient.email);
+    return;
+  }
+
+  const sessionsUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/sessions`;
+  const subject = role === 'backup'
+    ? 'You have been assigned as a backup trainer'
+    : 'A backup trainer has been assigned to your session';
+  const html = role === 'backup'
+    ? `<p>Hi ${recipient.name},</p><p>You've been assigned as the backup trainer for "${session.title}" on ${session.scheduled_date} at ${session.scheduled_time}, in case ${otherTrainerName || 'the assigned trainer'} is unable to make it.</p><p><a href="${sessionsUrl}">View in Sessions</a></p>`
+    : `<p>Hi ${recipient.name},</p><p>${otherTrainerName} has been assigned as a backup trainer for your session "${session.title}" on ${session.scheduled_date} at ${session.scheduled_time}, in case you're unable to make it.</p><p><a href="${sessionsUrl}">View in Sessions</a></p>`;
+
+  await resend.emails.send({
+    from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+    to: recipient.email,
+    subject,
+    html
+  });
+}
+
+module.exports = { sendWelcomeEmail, sendGoogleLinkPendingEmail, sendGoogleLinkDecisionEmail, sendBackupAssignedEmail };

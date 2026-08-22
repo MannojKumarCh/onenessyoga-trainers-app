@@ -6,6 +6,7 @@ import Modal from '../../components/Modal';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import TopicSelect from '../../components/TopicSelect';
 import SessionThumb from '../../components/SessionThumb';
+import WeeklySchedule from '../../components/WeeklySchedule';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, CalendarDaysIcon, PlusIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
@@ -14,6 +15,7 @@ import { useToast } from '../../context/ToastContext';
 const EMPTY_SESSION = { title: 'Daily Session', scheduled_date: '', scheduled_time: '06:15', session_type: 'BKP', assigned_trainer_id: '', zoom_link: '' };
 
 export default function AdminSessions() {
+  const [tab, setTab] = useState('sessions');
   const [sessions, setSessions] = useState([]);
   const [trainers, setTrainers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +26,11 @@ export default function AdminSessions() {
   const [error, setError] = useState('');
   const [dateFrom, setDateFrom] = useState(new Date().toISOString().split('T')[0]);
   const [deleteId, setDeleteId] = useState(null);
-  
+  const [backupFor, setBackupFor] = useState(null);
+  const [backupTrainerId, setBackupTrainerId] = useState('');
+  const [backupSubmitting, setBackupSubmitting] = useState(false);
+  const [backupError, setBackupError] = useState('');
+
   const { showToast } = useToast();
 
   const load = useCallback(() => {
@@ -67,6 +73,30 @@ export default function AdminSessions() {
     }
   }
 
+  function openBackup(session) {
+    setBackupFor(session);
+    setBackupTrainerId(session.backup_trainer_id || '');
+    setBackupError('');
+  }
+
+  async function submitBackup(e) {
+    e.preventDefault();
+    setBackupError('');
+    setBackupSubmitting(true);
+    try {
+      await client.patch(`/sessions/${backupFor.id}/backup`, {
+        backup_trainer_id: backupTrainerId ? Number(backupTrainerId) : null
+      });
+      setBackupFor(null);
+      showToast('Backup Trainer Updated');
+      load();
+    } catch (err) {
+      setBackupError(getApiErrorMessage(err, 'Failed to update backup trainer'));
+    } finally {
+      setBackupSubmitting(false);
+    }
+  }
+
   async function deleteSession(id) {
     setDeleteId(null);
     setError('');
@@ -85,9 +115,32 @@ export default function AdminSessions() {
     <div className="page">
       <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 className="page-title">Sessions</h1>
-        <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowForm(true)}><PlusIcon style={{ width: 16, height: 16 }} /> Add Session</button>
+        {tab === 'sessions' && (
+          <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowForm(true)}><PlusIcon style={{ width: 16, height: 16 }} /> Add Session</button>
+        )}
       </div>
 
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <button
+          className={`btn ${tab === 'sessions' ? 'btn-primary' : 'btn-ghost'}`}
+          style={{ padding: '7px 14px', fontSize: 13 }}
+          onClick={() => setTab('sessions')}
+        >
+          Sessions
+        </button>
+        <button
+          className={`btn ${tab === 'schedule' ? 'btn-primary' : 'btn-ghost'}`}
+          style={{ padding: '7px 14px', fontSize: 13 }}
+          onClick={() => setTab('schedule')}
+        >
+          Weekly Schedule
+        </button>
+      </div>
+
+      {tab === 'schedule' ? (
+        <WeeklySchedule trainers={trainers} />
+      ) : (
+        <>
       <div className="form-group">
         <label className="label" htmlFor="sessions-from-date">From Date</label>
         <input id="sessions-from-date" className="input" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
@@ -109,9 +162,15 @@ export default function AdminSessions() {
                 <div className="list-item-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {s.title} {s.is_completed && <span className="badge badge-approved">Done</span>}
                 </div>
-                <div className="list-item-sub">{s.scheduled_time} · {s.trainer_name || 'Unassigned'}</div>
+                <div className="list-item-sub">
+                  {s.scheduled_time} · {s.trainer_name || 'Unassigned'}
+                  {s.backup_trainer_name && ` · Backup: ${s.backup_trainer_name}`}
+                </div>
               </div>
-              <button onClick={() => setDeleteId(s.id)} style={{ color: 'var(--danger)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button onClick={() => openBackup(s)} style={{ color: 'var(--primary)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Backup</button>
+                <button onClick={() => setDeleteId(s.id)} style={{ color: 'var(--danger)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
+              </div>
             </div>
           ))}
         </div>
@@ -169,6 +228,34 @@ export default function AdminSessions() {
           onCancel={() => setDeleteId(null)}
           onConfirm={() => deleteSession(deleteId)}
         />
+      )}
+
+      {backupFor && (
+        <Modal title="Assign Backup Trainer" onClose={() => setBackupFor(null)}>
+          <form onSubmit={submitBackup}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
+              {backupFor.title} · {backupFor.scheduled_date} at {backupFor.scheduled_time} · Assigned to {backupFor.trainer_name || 'Unassigned'}
+            </p>
+            <div className="form-group">
+              <label className="label" htmlFor="backup-trainer">Backup Trainer</label>
+              <select id="backup-trainer" className="input" value={backupTrainerId} onChange={e => setBackupTrainerId(e.target.value)}>
+                <option value="">No Backup</option>
+                {trainers.filter(t => t.id !== backupFor.assigned_trainer_id).map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            {backupError && <p className="error-text" style={{ marginBottom: 12 }}>{backupError}</p>}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setBackupFor(null)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={backupSubmitting}>
+                {backupSubmitting ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      </>
       )}
     </div>
   );

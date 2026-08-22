@@ -50,7 +50,9 @@ model User {
   updated_at         DateTime         @updatedAt
 
   sessions_assigned  Session[]          @relation("SessionTrainer")
+  sessions_backup    Session[]          @relation("SessionBackupTrainer")
   sessions_created   Session[]          @relation("SessionCreator")
+  session_templates  SessionTemplate[]  @relation("SessionTemplateTrainer")
   leaves             Leave[]            @relation("LeaveTrainer")
   leaves_reviewed    Leave[]            @relation("LeaveReviewer")
   sequences_assigned Sequence[]         @relation("SequenceTrainer")
@@ -71,6 +73,8 @@ model Session {
   session_type        String?   @default("BKP")
   assigned_trainer_id Int?
   assigned_trainer    User?     @relation("SessionTrainer", fields: [assigned_trainer_id], references: [id], onDelete: SetNull)
+  backup_trainer_id   Int?
+  backup_trainer      User?     @relation("SessionBackupTrainer", fields: [backup_trainer_id], references: [id], onDelete: SetNull)
   zoom_link           String?
   notes               String?
   is_completed        Boolean   @default(false)
@@ -82,7 +86,24 @@ model Session {
 
   @@index([scheduled_date])
   @@index([assigned_trainer_id])
+  @@index([backup_trainer_id])
   @@map("sessions")
+}
+
+model SessionTemplate {
+  id                   Int      @id @default(autoincrement())
+  label                String
+  scheduled_time       String
+  weekdays             Int[]
+  session_type         String?  @default("BKP")
+  dedicated_trainer_id Int?
+  dedicated_trainer    User?    @relation("SessionTemplateTrainer", fields: [dedicated_trainer_id], references: [id], onDelete: SetNull)
+  title                String   @default("Daily Session")
+  is_active            Boolean  @default(true)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+
+  @@map("session_templates")
 }
 
 model Leave {

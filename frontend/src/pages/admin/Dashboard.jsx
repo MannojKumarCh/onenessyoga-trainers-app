@@ -384,6 +384,7 @@ export default function AdminDashboard() {
                         {s.scheduled_time}
                       </span>
                       <span>Trainer: <strong>{s.trainer_name || 'Unassigned'}</strong></span>
+                      {s.backup_trainer_name && <span>Backup: <strong>{s.backup_trainer_name}</strong></span>}
                     </div>
                   </div>
                 </div>

@@ -2,7 +2,8 @@ const router = require('express').Router();
 const prisma = require('../db/db');
 const { authenticate, requireRole, getUserRoles } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
-const { notifyUser } = require('../utils/notify');
+const { notifyUser, notifyUsers } = require('../utils/notify');
+const { sendBackupAssignedEmail } = require('../utils/mail');
 const validateIdParam = require('../middleware/validateIdParam');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
@@ -43,35 +44,48 @@ async function ensureTrainerExists(trainerId) {
 }
 
 function serialize(session) {
-  const { assigned_trainer, ...rest } = session;
-  return { ...rest, trainer_name: assigned_trainer?.name ?? null };
-}
-
-function serializeWithZoom(session) {
-  const { assigned_trainer, ...rest } = session;
+  const { assigned_trainer, backup_trainer, ...rest } = session;
   return {
     ...rest,
     trainer_name: assigned_trainer?.name ?? null,
-    trainer_zoom_link: assigned_trainer?.zoom_link ?? null
+    backup_trainer_name: backup_trainer?.name ?? null
   };
 }
 
-// Trainer: my upcoming sessions
+function serializeWithZoom(session) {
+  const { assigned_trainer, backup_trainer, ...rest } = session;
+  return {
+    ...rest,
+    trainer_name: assigned_trainer?.name ?? null,
+    trainer_zoom_link: assigned_trainer?.zoom_link ?? null,
+    backup_trainer_name: backup_trainer?.name ?? null,
+    backup_trainer_zoom_link: backup_trainer?.zoom_link ?? null
+  };
+}
+
+// Trainer: my upcoming sessions (as dedicated trainer or as backup)
 router.get('/my', authenticate, requireRole('trainer'), async (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   const sessions = await prisma.session.findMany({
-    where: { assigned_trainer_id: req.user.id, scheduled_date: { gte: today }, is_completed: false },
-    include: { assigned_trainer: { select: { name: true } } },
+    where: {
+      OR: [{ assigned_trainer_id: req.user.id }, { backup_trainer_id: req.user.id }],
+      scheduled_date: { gte: today },
+      is_completed: false
+    },
+    include: { assigned_trainer: { select: { name: true } }, backup_trainer: { select: { name: true } } },
     orderBy: [{ scheduled_date: 'asc' }, { scheduled_time: 'asc' }]
   });
-  res.json(sessions.map(serialize));
+  res.json(sessions.map(s => ({
+    ...serialize(s),
+    viewer_role: s.backup_trainer_id === req.user.id && s.assigned_trainer_id !== req.user.id ? 'backup' : 'assigned'
+  })));
 });
 
 // Trainer: completed sessions (all trainers visible)
 router.get('/completed', authenticate, async (req, res) => {
   const sessions = await prisma.session.findMany({
     where: { is_completed: true },
-    include: { assigned_trainer: { select: { name: true } } },
+    include: { assigned_trainer: { select: { name: true } }, backup_trainer: { select: { name: true } } },
     orderBy: [{ scheduled_date: 'desc' }, { scheduled_time: 'desc' }],
     take: 100
   });
@@ -91,7 +105,7 @@ router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
 
   const sessions = await prisma.session.findMany({
     where,
-    include: { assigned_trainer: { select: { name: true } } },
+    include: { assigned_trainer: { select: { name: true } }, backup_trainer: { select: { name: true } } },
     orderBy: [{ scheduled_date: 'desc' }, { scheduled_time: 'asc' }]
   });
   res.json(sessions.map(serialize));
@@ -101,15 +115,20 @@ router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
 router.get('/:id', authenticate, async (req, res) => {
   const session = await prisma.session.findUnique({
     where: { id: parseInt(req.params.id) },
-    include: { assigned_trainer: { select: { name: true, zoom_link: true } } }
+    include: {
+      assigned_trainer: { select: { name: true, zoom_link: true } },
+      backup_trainer: { select: { name: true, zoom_link: true } }
+    }
   });
   if (!session) return res.status(404).json({ error: 'Session not found' });
-  // Trainer-only viewers are restricted to their own sessions; anyone who also
-  // holds a broader role (admin/creator) can already see every session, so the
-  // restriction only applies when trainer is their sole relevant role.
+  // Trainer-only viewers are restricted to sessions where they're the dedicated
+  // or backup trainer; anyone who also holds a broader role (admin/creator) can
+  // already see every session, so the restriction only applies when trainer is
+  // their sole relevant role.
   const roles = getUserRoles(req.user);
   const isTrainerOnly = roles.includes('trainer') && !roles.includes('super_admin') && !roles.includes('sequence_creator');
-  if (isTrainerOnly && session.assigned_trainer_id !== req.user.id) {
+  const isParty = session.assigned_trainer_id === req.user.id || session.backup_trainer_id === req.user.id;
+  if (isTrainerOnly && !isParty) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   res.json(serializeWithZoom(session));
@@ -217,7 +236,9 @@ router.patch('/:id/complete', authenticate, requireRole('trainer'), async (req, 
   const id = parseInt(req.params.id);
   const session = await prisma.session.findUnique({ where: { id } });
   if (!session) return res.status(404).json({ error: 'Not found' });
-  if (session.assigned_trainer_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+  if (session.assigned_trainer_id !== req.user.id && session.backup_trainer_id !== req.user.id) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
 
   await prisma.session.update({
     where: { id },
@@ -242,7 +263,9 @@ router.patch('/:id/notes', authenticate, requireRole('trainer'), async (req, res
   const id = parseInt(req.params.id);
   const session = await prisma.session.findUnique({ where: { id } });
   if (!session) return res.status(404).json({ error: 'Not found' });
-  if (session.assigned_trainer_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+  if (session.assigned_trainer_id !== req.user.id && session.backup_trainer_id !== req.user.id) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
 
   await prisma.session.update({ where: { id }, data: { notes } });
 
@@ -253,6 +276,54 @@ router.patch('/:id/notes', authenticate, requireRole('trainer'), async (req, res
       body: `${req.user.name} added notes to "${session.title}"`,
       url: '/sessions'
     }).catch(() => {});
+  }
+
+  res.json({ success: true });
+});
+
+// Admin: assign or clear a backup trainer for a session. Does not touch
+// assigned_trainer_id - both the dedicated and backup trainer stay linked to
+// the session; the backup can act on it (notes/complete) exactly like the
+// dedicated trainer can (see the ownership checks above and on GET /:id).
+router.patch('/:id/backup', authenticate, requireRole('super_admin'), async (req, res) => {
+  const id = parseInt(req.params.id);
+  const session = await prisma.session.findUnique({ where: { id } });
+  if (!session) return res.status(404).json({ error: 'Not found' });
+
+  const backupId = await ensureTrainerExists(parseOptionalPositiveInt(req.body.backup_trainer_id, 'backup_trainer_id'));
+
+  if (backupId !== null && backupId === session.assigned_trainer_id) {
+    throw httpError(400, 'Backup trainer must be different from the assigned trainer');
+  }
+
+  await prisma.session.update({ where: { id }, data: { backup_trainer_id: backupId } });
+
+  // Notifications/email only fire on an actual assignment, not on clearing.
+  if (backupId) {
+    const [backupTrainer, assignedTrainer] = await Promise.all([
+      prisma.user.findUnique({ where: { id: backupId }, select: { id: true, name: true, email: true } }),
+      session.assigned_trainer_id
+        ? prisma.user.findUnique({ where: { id: session.assigned_trainer_id }, select: { id: true, name: true, email: true } })
+        : null
+    ]);
+
+    notifyUser(backupTrainer.id, {
+      title: 'Backup Trainer Assignment',
+      body: `You've been assigned as backup for "${session.title}" on ${session.scheduled_date} at ${session.scheduled_time}`,
+      url: `/sessions/${id}`
+    }).catch(() => {});
+    sendBackupAssignedEmail(backupTrainer, session, { role: 'backup', otherTrainerName: assignedTrainer?.name ?? null })
+      .catch(err => console.error('Failed to send backup-assignment email to backup trainer:', err));
+
+    if (assignedTrainer) {
+      notifyUser(assignedTrainer.id, {
+        title: 'Backup Trainer Assigned',
+        body: `${backupTrainer.name} will back you up on "${session.title}" on ${session.scheduled_date} at ${session.scheduled_time}`,
+        url: `/sessions/${id}`
+      }).catch(() => {});
+      sendBackupAssignedEmail(assignedTrainer, session, { role: 'assigned', otherTrainerName: backupTrainer.name })
+        .catch(err => console.error('Failed to send backup-assignment email to assigned trainer:', err));
+    }
   }
 
   res.json({ success: true });

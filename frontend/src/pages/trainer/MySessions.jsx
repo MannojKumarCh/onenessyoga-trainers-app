@@ -44,8 +44,13 @@ export default function MySessions() {
             <div key={s.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sessions/${s.id}`)}>
               <SessionThumb topic={s.session_type} />
               <div className="list-item-left">
-                <div className="list-item-title">{s.title}</div>
-                <div className="list-item-sub">{s.scheduled_time} · {s.session_type}</div>
+                <div className="list-item-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {s.title} {s.viewer_role === 'backup' && <span className="badge badge-info">Backup</span>}
+                </div>
+                <div className="list-item-sub">
+                  {s.scheduled_time} · {s.session_type}
+                  {s.viewer_role === 'assigned' && s.backup_trainer_name && ` · Covered by ${s.backup_trainer_name}`}
+                </div>
               </div>
               <ChevronRightIcon style={{ width: 16, height: 16 }} />
             </div>

@@ -2,7 +2,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const cron = require('node-cron');
 const prisma = require('./db/db');
+const { generateUpcomingSessions } = require('./utils/sessionGenerator');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,6 +35,7 @@ app.use(express.json());
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/sessions', require('./routes/sessions'));
+app.use('/api/session-templates', require('./routes/sessionTemplates'));
 app.use('/api/leaves', require('./routes/leaves'));
 app.use('/api/sequences', require('./routes/sequences'));
 app.use('/api/resources', require('./routes/resources'));
@@ -56,6 +59,19 @@ async function start() {
   try {
     await prisma.$connect(); // fail early if DB unreachable
     server = app.listen(PORT, () => console.log(`Oneness Yoga API running on port ${PORT}`));
+
+    // Keep the next 14 days of sessions populated from the weekly schedule
+    // template - once on boot (so a restart never leaves a gap until the next
+    // scheduled tick), then daily just after midnight IST.
+    generateUpcomingSessions()
+      .then(r => console.log(`[sessionGenerator] startup run: created ${r.created} session(s)`))
+      .catch(err => console.error('[sessionGenerator] startup run failed:', err));
+
+    cron.schedule('15 0 * * *', () => {
+      generateUpcomingSessions()
+        .then(r => console.log(`[sessionGenerator] daily run: created ${r.created} session(s)`))
+        .catch(err => console.error('[sessionGenerator] daily run failed:', err));
+    }, { timezone: 'Asia/Kolkata' });
   } catch (err) {
     console.error('Failed to connect to DB:', err);
     process.exit(1);

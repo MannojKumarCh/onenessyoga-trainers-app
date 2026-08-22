@@ -8,11 +8,13 @@ import { ExclamationTriangleIcon, ArrowLeftIcon, CheckCircleIcon } from '@heroic
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 import { getSessionImageUrl } from '../../config/sessionImages';
+import { useAuth } from '../../context/AuthContext';
 
 export default function SessionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const { user } = useAuth();
   const [session, setSession] = useState(null);
   const [loadError, setLoadError] = useState(false);
   const [notes, setNotes] = useState('');
@@ -81,11 +83,23 @@ export default function SessionDetail() {
         <h1 style={{ fontSize: 22, fontWeight: 700, marginTop: 4 }}>{session.title}</h1>
       </div>
 
+      {session.backup_trainer_id === user?.id && (
+        <div style={{ background: 'var(--info-light)', borderRadius: 'var(--radius-sm)', padding: '10px 16px', marginBottom: 16, textAlign: 'center', color: '#0055CC', fontWeight: 600, fontSize: 14 }}>
+          You're covering this session as backup
+        </div>
+      )}
+
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
           <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Assigned Trainer</span>
           <span style={{ fontWeight: 600 }}>{session.trainer_name}</span>
         </div>
+        {session.backup_trainer_name && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Backup Trainer</span>
+            <span style={{ fontWeight: 600 }}>{session.backup_trainer_name}</span>
+          </div>
+        )}
         {session.zoom_link && (
           <div style={{ padding: '10px 0' }}>
             <span style={{ color: 'var(--text-secondary)', fontSize: 14, display: 'block', marginBottom: 4 }}>Zoom Link</span>

@@ -190,9 +190,12 @@ export default function Dashboard() {
             >
               <SessionThumb topic={s.session_type} />
               <div className="list-item-left">
-                <div className="list-item-title" style={{ fontSize: 15, fontWeight: 700 }}>{s.title}</div>
+                <div className="list-item-title" style={{ fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {s.title} {s.viewer_role === 'backup' && <span className="badge badge-info">Backup</span>}
+                </div>
                 <div className="list-item-sub" style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>
                   {dayLabel(s.scheduled_date)} · {s.scheduled_time}
+                  {s.viewer_role === 'assigned' && s.backup_trainer_name && ` · Covered by ${s.backup_trainer_name}`}
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
