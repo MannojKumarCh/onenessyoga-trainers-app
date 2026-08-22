@@ -3,6 +3,9 @@ const prisma = require('../db/db');
 const { authenticate, requireRole } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const validateIdParam = require('../middleware/validateIdParam');
+const { notifyUser } = require('../utils/notify');
+
+const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
   const original = router[method].bind(router);
@@ -55,16 +58,42 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
     }
   }
 
+  const effectiveTime = scheduled_time ?? template.scheduled_time;
+
   await prisma.sessionTemplate.update({
     where: { id },
     data: {
-      scheduled_time: scheduled_time ?? template.scheduled_time,
+      scheduled_time: effectiveTime,
       session_type: session_type ?? template.session_type,
       title: title ?? template.title,
       is_active: is_active !== undefined ? Boolean(is_active) : template.is_active,
       dedicated_trainer_id: trainerId
     }
   });
+
+  // Backfill: a newly-set default trainer fills in currently-Unassigned upcoming
+  // sessions for this slot. Never touches sessions that already have a trainer
+  // (assigned via an earlier default or a manual override) - template edits
+  // must never retroactively override an explicit assignment.
+  if (trainerId && trainerId !== template.dedicated_trainer_id) {
+    const todayIst = new Date(Date.now() + IST_OFFSET_MS).toISOString().split('T')[0];
+    const candidates = await prisma.session.findMany({
+      where: { scheduled_time: effectiveTime, assigned_trainer_id: null, scheduled_date: { gte: todayIst } },
+      select: { id: true, scheduled_date: true }
+    });
+    const matchIds = candidates
+      .filter(s => template.weekdays.includes(new Date(`${s.scheduled_date}T00:00:00Z`).getUTCDay()))
+      .map(s => s.id);
+
+    if (matchIds.length > 0) {
+      await prisma.session.updateMany({ where: { id: { in: matchIds } }, data: { assigned_trainer_id: trainerId } });
+      notifyUser(trainerId, {
+        title: 'Default Sessions Assigned',
+        body: `You're now the default trainer for ${matchIds.length} upcoming "${template.label}" session(s)`,
+        url: '/sessions'
+      }).catch(() => {});
+    }
+  }
 
   res.json({ success: true });
 });

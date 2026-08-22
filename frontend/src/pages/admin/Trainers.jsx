@@ -16,11 +16,13 @@ const EMPTY = { name: '', email: '', password: '', roles: ['trainer'], zoom_link
 export default function AdminTrainers() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
+  const [defaultSlotIds, setDefaultSlotIds] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [resetPw, setResetPw] = useState({ show: false, id: null, password: '' });
@@ -34,19 +36,32 @@ export default function AdminTrainers() {
   const { showToast } = useToast();
 
   const load = useCallback(() => {
-    client.get('/users').then(r => setUsers(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
+    Promise.all([client.get('/users'), client.get('/session-templates')])
+      .then(([u, t]) => { setUsers(u.data); setTemplates(t.data); })
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
   
   usePolling(load, 30000);
 
-  function openAdd() { setEditing(null); setForm(EMPTY); setError(''); setShowForm(true); }
+  function openAdd() { setEditing(null); setForm(EMPTY); setDefaultSlotIds([]); setError(''); setShowForm(true); }
   function openEdit(u) {
     setEditing(u);
     setForm({ name: u.name, email: u.email, password: '', roles: u.roles, zoom_link: u.zoom_link || '' });
+    setDefaultSlotIds(templates.filter(t => t.dedicated_trainer_id === u.id).map(t => t.id));
     setError('');
     setShowForm(true);
+  }
+
+  async function applyDefaultSlots(userId, previousIds) {
+    const toAssign = defaultSlotIds.filter(id => !previousIds.includes(id));
+    const toClear = previousIds.filter(id => !defaultSlotIds.includes(id));
+    await Promise.all([
+      ...toAssign.map(id => client.put(`/session-templates/${id}`, { dedicated_trainer_id: userId })),
+      ...toClear.map(id => client.put(`/session-templates/${id}`, { dedicated_trainer_id: null }))
+    ]);
   }
 
   async function submit(e) {
@@ -56,8 +71,13 @@ export default function AdminTrainers() {
     try {
       if (editing) {
         await client.put(`/users/${editing.id}`, { name: form.name, email: form.email, roles: form.roles, zoom_link: form.zoom_link });
+        const previousIds = templates.filter(t => t.dedicated_trainer_id === editing.id).map(t => t.id);
+        await applyDefaultSlots(editing.id, previousIds);
       } else {
-        await client.post('/users', form);
+        const { data } = await client.post('/users', form);
+        if (form.roles.includes('trainer') && defaultSlotIds.length > 0) {
+          await applyDefaultSlots(data.id, []);
+        }
       }
       setShowForm(false);
       showToast('Trainer Saved Successfully');
@@ -214,6 +234,29 @@ export default function AdminTrainers() {
                   ))}
                 </div>
               </div>
+              {form.roles.includes('trainer') && (
+                <div className="form-group">
+                  <label className="label">Default Sessions</label>
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px' }}>
+                    This trainer is automatically assigned to these slots as new sessions are generated. Checking a slot already held by someone else reassigns it.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {templates.map(t => (
+                      <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+                        <input
+                          type="checkbox"
+                          checked={defaultSlotIds.includes(t.id)}
+                          onChange={e => setDefaultSlotIds(ids => e.target.checked ? [...ids, t.id] : ids.filter(id => id !== t.id))}
+                        />
+                        {t.label}
+                        {t.dedicated_trainer_id && t.dedicated_trainer_id !== editing?.id && (
+                          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>(currently: {t.dedicated_trainer_name})</span>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="form-group">
                 <label className="label" htmlFor="trainer-zoom">Zoom Link</label>
                 <input id="trainer-zoom" className="input" type="url" value={form.zoom_link} placeholder="https://us06web.zoom.us/j/…" onChange={e => setForm(f => ({ ...f, zoom_link: e.target.value }))} />
