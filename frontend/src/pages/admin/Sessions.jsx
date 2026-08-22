@@ -30,6 +30,10 @@ export default function AdminSessions() {
   const [backupTrainerId, setBackupTrainerId] = useState('');
   const [backupSubmitting, setBackupSubmitting] = useState(false);
   const [backupError, setBackupError] = useState('');
+  const [assignFor, setAssignFor] = useState(null);
+  const [assignTrainerId, setAssignTrainerId] = useState('');
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
+  const [assignError, setAssignError] = useState('');
 
   const { showToast } = useToast();
 
@@ -94,6 +98,32 @@ export default function AdminSessions() {
       setBackupError(getApiErrorMessage(err, 'Failed to update backup trainer'));
     } finally {
       setBackupSubmitting(false);
+    }
+  }
+
+  function openAssign(session) {
+    setAssignFor(session);
+    setAssignTrainerId(session.assigned_trainer_id || '');
+    setAssignError('');
+  }
+
+  async function submitAssign(e) {
+    e.preventDefault();
+    setAssignError('');
+    setAssignSubmitting(true);
+    try {
+      if (!assignTrainerId) {
+        setAssignError('Please select a trainer.');
+        return;
+      }
+      await client.put(`/sessions/${assignFor.id}`, { assigned_trainer_id: Number(assignTrainerId) });
+      setAssignFor(null);
+      showToast('Trainer Assigned');
+      load();
+    } catch (err) {
+      setAssignError(getApiErrorMessage(err, 'Failed to assign trainer'));
+    } finally {
+      setAssignSubmitting(false);
     }
   }
 
@@ -168,6 +198,7 @@ export default function AdminSessions() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
+                <button onClick={() => openAssign(s)} style={{ color: 'var(--primary)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Assign</button>
                 <button onClick={() => openBackup(s)} style={{ color: 'var(--primary)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Backup</button>
                 <button onClick={() => setDeleteId(s.id)} style={{ color: 'var(--danger)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
               </div>
@@ -228,6 +259,32 @@ export default function AdminSessions() {
           onCancel={() => setDeleteId(null)}
           onConfirm={() => deleteSession(deleteId)}
         />
+      )}
+
+      {assignFor && (
+        <Modal title="Assign Trainer" onClose={() => setAssignFor(null)}>
+          <form onSubmit={submitAssign}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
+              {assignFor.title} · {assignFor.scheduled_date} at {assignFor.scheduled_time}
+            </p>
+            <div className="form-group">
+              <label className="label" htmlFor="assign-trainer">Trainer</label>
+              <select id="assign-trainer" className="input" value={assignTrainerId} onChange={e => setAssignTrainerId(e.target.value)}>
+                <option value="">Select a trainer</option>
+                {trainers.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            {assignError && <p className="error-text" style={{ marginBottom: 12 }}>{assignError}</p>}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setAssignFor(null)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={assignSubmitting}>
+                {assignSubmitting ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {backupFor && (
