@@ -425,6 +425,19 @@ Verified locally: a session on a date with no sequence still shows "Daily Sessio
 
 ---
 
+## 23. Phase 1 complete — prod deployment (2026-08-23)
+
+`main` caught up to `dev` again (§16-22: real app icon/logo, default-trainer assignment + backfill, code-health fixes, Forgot/Reset Password, must-change-password on admin-created/reset accounts, the login-redirect and clickable-logo fixes, and sessions reflecting the day's sequence topic) and deployed to prod in one pass, marking Phase 1 complete.
+
+1. `pg_dump` backup of the prod DB first (`oneness_trainers_prod_pre_phase1_final_<timestamp>.sql`).
+2. `git checkout main && git pull` on `/opt/oneness-yoga/prod`.
+3. `npx prisma migrate deploy` applied the 2 pending migrations (`add_password_resets`, `add_must_change_password`) cleanly.
+4. Backend + frontend `npm install`, `npx prisma generate`, `npm run build`, `pm2 restart oneness-yoga-prod-api`.
+
+Verified live against `trainers.onenessyoga.in`: correct new bundle serving (checked for "Forgot password" and "Set a New Password" strings), `POST /api/auth/forgot-password` reachable and giving the no-enumeration response, `GET /api/session-templates` still correctly 401s without auth, `POST /api/sessions/bulk` still 404s. No errors in PM2 logs after restart.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).
