@@ -478,6 +478,14 @@ Deployed to dev **and prod** (both `nginx` reload + PM2 restart on both), since 
 
 ---
 
+## 27. "My Sessions" tab for a super_admin who's also a trainer (2026-08-23)
+
+Reported by Mannoj: as `super_admin` + `trainer`, the Sessions page showed every session studio-wide, not just his own for the week. Root cause is `App.jsx`'s route-merging design (documented since it was built): when a user holds multiple roles and two roles both define a page at the same path (`trainer` and `super_admin` both have `'sessions'`), the higher-precedence role's page wins the collision entirely - there was never a way to see the other role's version of that same path. This is correct/intended for every other colliding path (Dashboard, Sequences), where the admin view is what a multi-role admin wants by default - but Sessions is the one place a super_admin-who-also-teaches genuinely wants their own personal weekly view too, not instead of the admin view.
+
+Rather than touching the routing/precedence system (higher risk, affects every multi-role path), added a third tab to the existing admin Sessions page (`admin/Sessions.jsx`, alongside the "Sessions" and "Weekly Schedule" tabs already there) - "My Sessions" - shown only when `user.roles.includes('trainer')`, rendering the existing `trainer/MySessions.jsx` component as-is (it's fully self-contained, fetches `/sessions/my` itself, and its "tap to view detail" navigation already correctly reaches `SessionDetail` regardless of role, since that path never collides between trainer and super_admin's route tables). No new route, no new path, nothing for a pure trainer or pure admin to notice - purely additive for the one role combination that needed it.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).

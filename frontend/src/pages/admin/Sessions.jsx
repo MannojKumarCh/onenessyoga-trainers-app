@@ -7,10 +7,12 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import TopicSelect from '../../components/TopicSelect';
 import SessionThumb from '../../components/SessionThumb';
 import WeeklySchedule from '../../components/WeeklySchedule';
+import MySessions from '../trainer/MySessions';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, CalendarDaysIcon, PlusIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 
 const EMPTY_SESSION = { title: 'Daily Session', scheduled_date: '', scheduled_time: '06:15', session_type: 'BKP', assigned_trainer_id: '', zoom_link: '' };
 
@@ -36,6 +38,8 @@ export default function AdminSessions() {
   const [assignError, setAssignError] = useState('');
 
   const { showToast } = useToast();
+  const { user } = useAuth();
+  const isAlsoTrainer = user.roles.includes('trainer');
 
   const load = useCallback(() => {
     setLoading(true);
@@ -165,10 +169,21 @@ export default function AdminSessions() {
         >
           Weekly Schedule
         </button>
+        {isAlsoTrainer && (
+          <button
+            className={`btn ${tab === 'mine' ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ padding: '7px 14px', fontSize: 13 }}
+            onClick={() => setTab('mine')}
+          >
+            My Sessions
+          </button>
+        )}
       </div>
 
       {tab === 'schedule' ? (
         <WeeklySchedule trainers={trainers} />
+      ) : tab === 'mine' ? (
+        <MySessions />
       ) : (
         <>
       <div className="form-group">
