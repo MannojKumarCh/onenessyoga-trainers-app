@@ -29,19 +29,42 @@ function parseOptionalPositiveInt(value, fieldName) {
   return parsed;
 }
 
-function serialize(session) {
+// A day with a Sequence assigned (to any trainer) shows that sequence's
+// topic as the session title, in place of the generic "Daily Session" -
+// irrespective of which trainer the sequence belongs to. If more than one
+// sequence somehow lands on the same date, the earliest-created one wins.
+async function getSequenceTopicByDate(dates) {
+  const uniqueDates = [...new Set(dates)];
+  if (uniqueDates.length === 0) return new Map();
+
+  const sequences = await prisma.sequence.findMany({
+    where: { scheduled_date: { in: uniqueDates } },
+    select: { scheduled_date: true, topic: true },
+    orderBy: { id: 'asc' }
+  });
+
+  const topicByDate = new Map();
+  for (const seq of sequences) {
+    if (!topicByDate.has(seq.scheduled_date)) topicByDate.set(seq.scheduled_date, seq.topic);
+  }
+  return topicByDate;
+}
+
+function serialize(session, topicByDate = new Map()) {
   const { assigned_trainer, backup_trainer, ...rest } = session;
   return {
     ...rest,
+    title: topicByDate.get(session.scheduled_date) ?? rest.title,
     trainer_name: assigned_trainer?.name ?? null,
     backup_trainer_name: backup_trainer?.name ?? null
   };
 }
 
-function serializeWithZoom(session) {
+function serializeWithZoom(session, topicByDate = new Map()) {
   const { assigned_trainer, backup_trainer, ...rest } = session;
   return {
     ...rest,
+    title: topicByDate.get(session.scheduled_date) ?? rest.title,
     trainer_name: assigned_trainer?.name ?? null,
     trainer_zoom_link: assigned_trainer?.zoom_link ?? null,
     backup_trainer_name: backup_trainer?.name ?? null,
@@ -61,8 +84,9 @@ router.get('/my', authenticate, requireRole('trainer'), async (req, res) => {
     include: { assigned_trainer: { select: { name: true } }, backup_trainer: { select: { name: true } } },
     orderBy: [{ scheduled_date: 'asc' }, { scheduled_time: 'asc' }]
   });
+  const topicByDate = await getSequenceTopicByDate(sessions.map(s => s.scheduled_date));
   res.json(sessions.map(s => ({
-    ...serialize(s),
+    ...serialize(s, topicByDate),
     viewer_role: s.backup_trainer_id === req.user.id && s.assigned_trainer_id !== req.user.id ? 'backup' : 'assigned'
   })));
 });
@@ -75,7 +99,8 @@ router.get('/completed', authenticate, async (req, res) => {
     orderBy: [{ scheduled_date: 'desc' }, { scheduled_time: 'desc' }],
     take: 100
   });
-  res.json(sessions.map(serialize));
+  const topicByDate = await getSequenceTopicByDate(sessions.map(s => s.scheduled_date));
+  res.json(sessions.map(s => serialize(s, topicByDate)));
 });
 
 // Admin: all sessions
@@ -94,7 +119,8 @@ router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
     include: { assigned_trainer: { select: { name: true } }, backup_trainer: { select: { name: true } } },
     orderBy: [{ scheduled_date: 'desc' }, { scheduled_time: 'asc' }]
   });
-  res.json(sessions.map(serialize));
+  const topicByDate = await getSequenceTopicByDate(sessions.map(s => s.scheduled_date));
+  res.json(sessions.map(s => serialize(s, topicByDate)));
 });
 
 // Get single session
@@ -117,7 +143,8 @@ router.get('/:id', authenticate, async (req, res) => {
   if (isTrainerOnly && !isParty) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  res.json(serializeWithZoom(session));
+  const topicByDate = await getSequenceTopicByDate([session.scheduled_date]);
+  res.json(serializeWithZoom(session, topicByDate));
 });
 
 // Admin: create session

@@ -415,6 +415,16 @@ Two small navigation fixes:
 
 ---
 
+## 22. Session titles reflect the day's assigned sequence topic (2026-08-23)
+
+`Session` and `Sequence` were (and still are) unrelated models - a Session is a recurring generated time-slot, a Sequence is the day's assigned practice topic. Sessions always displayed the generic "Daily Session" title regardless of whether a Sequence existed for that date. Per explicit instruction, the match is by **date alone, irrespective of trainer** - if any Sequence exists for a given `scheduled_date` (regardless of which trainer it's assigned to), every Session on that date shows that Sequence's `topic` as its title instead of "Daily Session"; dates with no Sequence are unaffected.
+
+Implementation is entirely in `backend/src/routes/sessions.js`'s serialization layer - a new `getSequenceTopicByDate(dates)` batch-queries `Sequence` for the distinct dates being returned (one extra indexed query per request, not N+1) and builds a `date -> topic` map; `serialize()`/`serializeWithZoom()` now overlay that onto the session's own `title` field before it's ever sent to the frontend. This covers `GET /`, `GET /my`, `GET /completed`, and `GET /:id` in one change - no frontend edits needed, since every page already just renders whatever `title` the API returns. If two Sequences somehow land on the same date, the earliest-created one wins (arbitrary but deterministic - this is expected to be rare/non-existent in practice, one topic per day).
+
+Verified locally: a session on a date with no sequence still shows "Daily Session"; creating a sequence on that date for a *different* trainer than the session's own trainer immediately flips the session's title to the sequence's topic, confirmed via both the list endpoint and the single-session endpoint; deleting the sequence and session cleaned up.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).
