@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const rateLimit = require('express-rate-limit');
@@ -7,7 +8,9 @@ const prisma = require('../db/db');
 const { authenticate } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const { notifyUsers } = require('../utils/notify');
-const { sendGoogleLinkPendingEmail } = require('../utils/mail');
+const { sendGoogleLinkPendingEmail, sendPasswordResetEmail } = require('../utils/mail');
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -122,6 +125,52 @@ router.post('/google', loginLimiter, async (req, res) => {
     token,
     user: { id: user.id, name: user.name, email: user.email, roles: user.roles, zoom_link: user.zoom_link }
   });
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many password reset requests, please try again later.' }
+});
+
+router.post('/forgot-password', forgotPasswordLimiter, async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  const user = await prisma.user.findFirst({ where: { email: email.toLowerCase().trim(), is_active: true } });
+  if (user) {
+    const token = crypto.randomBytes(32).toString('hex');
+    await prisma.passwordReset.create({
+      data: { user_id: user.id, token, expires_at: new Date(Date.now() + RESET_TOKEN_TTL_MS) }
+    });
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
+    sendPasswordResetEmail(user, resetUrl).catch(err => console.error('Failed to send password reset email:', err));
+  }
+
+  // Same response whether or not the email matched an account, so this
+  // endpoint can't be used to check which emails have accounts.
+  res.json({ success: true, message: 'If an account exists for that email, a reset link has been sent.' });
+});
+
+router.post('/reset-password', async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'Token and password are required' });
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+
+  const reset = await prisma.passwordReset.findUnique({ where: { token } });
+  if (!reset || reset.used_at || reset.expires_at < new Date()) {
+    return res.status(400).json({ error: 'This reset link is invalid or has expired. Please request a new one.' });
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: reset.user_id }, data: { password_hash: hash } }),
+    prisma.passwordReset.update({ where: { id: reset.id }, data: { used_at: new Date() } })
+  ]);
+
+  res.json({ success: true });
 });
 
 router.get('/me', authenticate, async (req, res) => {

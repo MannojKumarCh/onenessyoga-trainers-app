@@ -67,4 +67,13 @@ async function sendBackupAssignedEmail(recipient, session, { role, otherTrainerN
   });
 }
 
-module.exports = { sendWelcomeEmail, sendGoogleLinkPendingEmail, sendGoogleLinkDecisionEmail, sendBackupAssignedEmail };
+async function sendPasswordResetEmail(user, resetUrl) {
+  await sendEmail({
+    to: user.email,
+    subject: 'Reset your Oneness Yoga password',
+    html: `<p>Hi ${user.name},</p><p>We received a request to reset your password. This link expires in 1 hour and can only be used once.</p><p><a href="${resetUrl}">Reset your password</a></p><p>If you didn't request this, you can safely ignore this email.</p>`,
+    skipContext: `password reset email to ${user.email}`
+  });
+}
+
+module.exports = { sendWelcomeEmail, sendGoogleLinkPendingEmail, sendGoogleLinkDecisionEmail, sendBackupAssignedEmail, sendPasswordResetEmail };

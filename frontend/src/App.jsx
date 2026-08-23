@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import LoginPage from './pages/LoginPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import AppLayout from './components/AppLayout';
 import Dashboard from './pages/trainer/Dashboard';
 import MySessions from './pages/trainer/MySessions';
@@ -109,7 +111,13 @@ function AppRoutes() {
   usePageTitle();
   useRedirectHomeOnFreshBoot(user);
 
-  if (!user) return <Routes><Route path="*" element={<LoginPage />} /></Routes>;
+  if (!user) return (
+    <Routes>
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="*" element={<LoginPage />} />
+    </Routes>
+  );
 
   const { merged, indexElement } = buildRoutes(user.roles);
 

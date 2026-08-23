@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import PasswordInput from '../components/PasswordInput';
@@ -95,6 +96,10 @@ export default function LoginPage() {
             </div>
 
             {error && <p className="error-text" style={{ marginBottom: 16 }}>{error}</p>}
+
+            <div style={{ textAlign: 'right', marginBottom: 16 }}>
+              <Link to="/forgot-password" style={{ fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>Forgot password?</Link>
+            </div>
 
             <button className="btn btn-primary btn-full" type="submit" disabled={loading} style={{ marginTop: 4 }}>
               {loading ? 'Signing In…' : 'Sign In'}

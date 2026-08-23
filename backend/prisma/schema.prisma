@@ -61,8 +61,22 @@ model User {
   push_subscriptions PushSubscription[]
   notifications      Notification[]
   ai_schedule_logs   AiScheduleLog[]
+  password_resets    PasswordReset[]
 
   @@map("users")
+}
+
+model PasswordReset {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  token      String    @unique
+  expires_at DateTime
+  used_at    DateTime?
+  created_at DateTime  @default(now())
+
+  @@index([user_id])
+  @@map("password_resets")
 }
 
 model Session {

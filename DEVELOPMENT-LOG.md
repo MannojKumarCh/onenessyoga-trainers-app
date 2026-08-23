@@ -377,6 +377,19 @@ Verified against the live prod domain (`trainers.onenessyoga.in`) after restart:
 
 ---
 
+## 19. Self-service Forgot/Reset Password (2026-08-23)
+
+The only password-reset path that existed was admin-triggered (`PUT /users/:id/reset-password`) - a trainer locked out of their own account had no way to recover without asking a super_admin. Added the standard email-link flow:
+
+- New `PasswordReset` model (`user_id`, unique `token`, `expires_at`, `used_at`) - a separate table rather than fields on `User`, so a user can have reset history and multiple outstanding tokens without overloading the user row.
+- `POST /auth/forgot-password` (public, rate-limited to 5/15min like the existing login limiter): looks up the email, and **if and only if** a matching active user exists, creates a token (`crypto.randomBytes(32)`, 1 hour expiry) and emails a reset link via a new `sendPasswordResetEmail` (`backend/src/utils/mail.js`, using the shared `sendEmail` helper from §17). Returns the exact same `{ success: true }` response whether or not the email matched an account, so the endpoint can't be used to check which emails have registered accounts.
+- `POST /auth/reset-password` (public): validates the token exists, is unused, and hasn't expired, then updates the password and marks the token used in a single `$transaction` (so a crash between the two can't leave the token burned with the password unchanged, or vice versa).
+- Frontend: a "Forgot password?" link on `LoginPage.jsx`, plus two new pages - `ForgotPasswordPage.jsx` (email in, generic "check your email" out) and `ResetPasswordPage.jsx` (reads `?token=` from the URL, new password + confirm, calls the reset endpoint) - both public routes added to `App.jsx`'s logged-out route branch (previously a bare wildcard straight to `LoginPage`).
+
+Verified locally end-to-end without triggering any real email (started the backend with `RESEND_API_KEY` blanked so the send call takes its "not configured" branch instead, per the standing caution around real trainer inboxes in local `.env` - see §14): forgot-password returns the identical response for a real vs. nonexistent email and only creates a token row for the real one; reset-password 400s on a bogus token, 400s on a too-short password, 200s on the valid token, then 400s again if that same token is replayed; and the account's old password stopped working and the new one logged in successfully immediately after.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).
