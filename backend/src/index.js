@@ -9,6 +9,14 @@ const { generateUpcomingSessions } = require('./utils/sessionGenerator');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Behind nginx (proxy_pass to 127.0.0.1) - without this, every request looks
+// like it comes from 127.0.0.1 to Express, so the IP-keyed rate limiters
+// (login, forgot-password, AI schedule) treat the entire user base as one
+// shared bucket instead of limiting per real client. 'loopback' trusts only
+// the immediate hop (nginx on the same box), and reads the real client IP
+// from X-Forwarded-For, which nginx must be configured to set.
+app.set('trust proxy', 'loopback');
+
 const FRONTEND_URL = process.env.FRONTEND_URL;
 if (!FRONTEND_URL && process.env.NODE_ENV === 'production') {
   throw new Error('FRONTEND_URL must be set in production');

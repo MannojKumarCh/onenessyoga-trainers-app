@@ -464,6 +464,20 @@ Verified locally: `PUT /auth/me` and admin's `POST /users` both reject a number 
 
 ---
 
+## 26. Fix login rate limit being shared across ALL users, not per-person (2026-08-23)
+
+Reported directly by a real trainer hitting "Too many login attempts, please try again later" on prod without having made anywhere near 10 attempts themselves. Root cause: nginx proxies every request to the Node backend via `proxy_pass http://127.0.0.1:PORT`, so every request Express sees arrives from `127.0.0.1` - Express was never told to trust the proxy or read the real client IP from a forwarded header. `express-rate-limit`'s login/Google-signin limiter (`10 per 15 min`) keys on IP by default, so with every request looking identical, **the entire trainer base shared one bucket** - once any combination of trainers' login/Google attempts (including simple typos) added up to 10 within 15 minutes, *everyone* got locked out, not just whoever made the attempts. The same blast radius applies to the forgot-password and AI-schedule-generation limiters, which use the same default IP-keying.
+
+Fixed with the standard two-sided reverse-proxy fix:
+- `backend/src/index.js`: `app.set('trust proxy', 'loopback')` - trusts only the immediate hop (nginx running on the same box), reading the real client IP from `X-Forwarded-For` rather than blindly trusting any spoofable header from arbitrary clients.
+- `deploy/nginx-dev.conf` and `deploy/nginx-prod.conf`: added `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` - nginx was already setting `X-Real-IP` (which Express's trust-proxy mechanism doesn't read), but never `X-Forwarded-For` (which it does).
+
+Verified locally: a request carrying a spoofed `X-Forwarded-For` header is correctly read as that IP by `req.ip` once `trust proxy` is set; a request with no such header (i.e. a direct, non-proxied connection) still correctly falls back to the loopback address, matching `'loopback'`'s intended trust boundary.
+
+Deployed to dev **and prod** (both `nginx` reload + PM2 restart on both), since this was actively blocking real trainers - the standard dev-first-then-later-prod cadence was skipped here given the production impact.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).
