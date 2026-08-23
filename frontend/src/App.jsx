@@ -5,6 +5,7 @@ import { ToastProvider } from './context/ToastContext';
 import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 import AppLayout from './components/AppLayout';
 import Dashboard from './pages/trainer/Dashboard';
 import MySessions from './pages/trainer/MySessions';
@@ -117,6 +118,13 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="*" element={<LoginPage />} />
     </Routes>
+  );
+
+  // Admin-created and admin-reset accounts start with a temporary password
+  // that must be changed before anything else is usable - blocks every
+  // other route until they set their own.
+  if (user.must_change_password) return (
+    <Routes><Route path="*" element={<ChangePasswordPage />} /></Routes>
   );
 
   const { merged, indexElement } = buildRoutes(user.roles);

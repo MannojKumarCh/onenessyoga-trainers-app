@@ -47,7 +47,7 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
 
   const hash = await bcrypt.hash(password, 10);
   const user = await prisma.user.create({
-    data: { name: name.trim(), email: normalizedEmail, password_hash: hash, roles, zoom_link: zoom_link || null }
+    data: { name: name.trim(), email: normalizedEmail, password_hash: hash, roles, zoom_link: zoom_link || null, must_change_password: true }
   });
 
   await sendWelcomeEmail(user).catch(err => console.error('Failed to send welcome email:', err));
@@ -96,7 +96,7 @@ router.put('/:id/reset-password', authenticate, requireRole('super_admin'), asyn
   if (!password || password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
   const hash = await bcrypt.hash(password, 10);
-  await prisma.user.update({ where: { id: parseInt(req.params.id) }, data: { password_hash: hash } });
+  await prisma.user.update({ where: { id: parseInt(req.params.id) }, data: { password_hash: hash, must_change_password: true } });
   res.json({ success: true });
 });
 

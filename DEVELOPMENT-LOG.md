@@ -390,6 +390,20 @@ Verified locally end-to-end without triggering any real email (started the backe
 
 ---
 
+## 20. Must-change-password on first login / after an admin reset (2026-08-23)
+
+Scoping this out surfaced a real gap: `PUT /me/password` (self-service password change) already existed on the backend, but no frontend page had ever called it - a logged-in trainer had no in-app way to change their own password at all (only the just-built forgot-password email flow, or asking an admin to reset it for them).
+
+- New `User.must_change_password` boolean (default `false`). Set to `true` whenever an admin creates an account (`POST /users`) or resets someone's password (`PUT /users/:id/reset-password`); cleared back to `false` by any of the three ways a user can set their own password afterward - `PUT /auth/me/password` (the new in-app change-password page), `POST /auth/reset-password` (§19's forgot-password flow), or naturally never set in the first place for a normal self-driven signup path (there isn't one - all accounts are admin-created, so this only ever starts `true`).
+- `POST /auth/login` and `POST /auth/google` now return `must_change_password` on the `user` object (there's no separate `/auth/me` re-fetch on app boot - `AuthContext` reads the login response once into `localStorage` - so the flag has to travel in that response to be visible to the frontend gate).
+- `App.jsx`: when `user.must_change_password` is true, every route is replaced with a new `ChangePasswordPage` (current + new + confirm password, calls `PUT /auth/me/password`, then `updateUser({ must_change_password: false })` to unblock immediately without a re-login) until they set their own password. This is the first real caller of `AuthContext`'s existing `updateUser` helper, which had been dead code since it was added.
+
+This is a frontend-enforced gate, not a backend-enforced one - the API itself doesn't reject other requests while the flag is true (matching how role-based page access already works in this app: `requireRole` protects the actual data per-route, but "which pages you can navigate to" is a frontend concern). Worth revisiting as a stricter backend-side block later if that matters more than the added complexity of an allowlist middleware.
+
+Verified locally end-to-end: a freshly admin-created account logs in with `must_change_password: true`; changing the password via the new endpoint flips it to `false` and a fresh login confirms it; a super_admin resetting that same user's password flips it back to `true`, proving the flag correctly re-arms on every admin-initiated credential handout, not just at account creation.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).

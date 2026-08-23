@@ -48,7 +48,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 
   res.json({
     token,
-    user: { id: user.id, name: user.name, email: user.email, roles: user.roles, zoom_link: user.zoom_link }
+    user: { id: user.id, name: user.name, email: user.email, roles: user.roles, zoom_link: user.zoom_link, must_change_password: user.must_change_password }
   });
 });
 
@@ -123,7 +123,7 @@ router.post('/google', loginLimiter, async (req, res) => {
 
   res.json({
     token,
-    user: { id: user.id, name: user.name, email: user.email, roles: user.roles, zoom_link: user.zoom_link }
+    user: { id: user.id, name: user.name, email: user.email, roles: user.roles, zoom_link: user.zoom_link, must_change_password: user.must_change_password }
   });
 });
 
@@ -166,7 +166,7 @@ router.post('/reset-password', async (req, res) => {
 
   const hash = await bcrypt.hash(password, 10);
   await prisma.$transaction([
-    prisma.user.update({ where: { id: reset.user_id }, data: { password_hash: hash } }),
+    prisma.user.update({ where: { id: reset.user_id }, data: { password_hash: hash, must_change_password: false } }),
     prisma.passwordReset.update({ where: { id: reset.id }, data: { used_at: new Date() } })
   ]);
 
@@ -176,7 +176,7 @@ router.post('/reset-password', async (req, res) => {
 router.get('/me', authenticate, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    select: { id: true, name: true, email: true, roles: true, zoom_link: true, created_at: true }
+    select: { id: true, name: true, email: true, roles: true, zoom_link: true, created_at: true, must_change_password: true }
   });
   res.json(user);
 });
@@ -201,7 +201,7 @@ router.put('/me/password', authenticate, async (req, res) => {
   }
 
   const hash = await bcrypt.hash(new_password, 10);
-  await prisma.user.update({ where: { id: req.user.id }, data: { password_hash: hash } });
+  await prisma.user.update({ where: { id: req.user.id }, data: { password_hash: hash, must_change_password: false } });
   res.json({ success: true });
 });
 
