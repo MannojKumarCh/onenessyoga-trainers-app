@@ -10,6 +10,10 @@ import { useToast } from '../../context/ToastContext';
 import { getSessionImageUrl } from '../../config/sessionImages';
 import { useAuth } from '../../context/AuthContext';
 
+function isLikelyUrl(value) {
+  return /^https?:\/\//i.test(value.trim());
+}
+
 export default function SessionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -109,6 +113,57 @@ export default function SessionDetail() {
           </div>
         )}
       </div>
+
+      {session.sequence?.instructions && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <p style={{ fontWeight: 700, marginBottom: 8 }}>Instructions</p>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{session.sequence.instructions}</p>
+        </div>
+      )}
+
+      {session.sequence?.items?.length > 0 && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <p style={{ fontWeight: 700, marginBottom: 12 }}>Sequence Content</p>
+          {session.sequence.items.map((item, i) => (
+            <div
+              key={item.id}
+              style={{
+                padding: '10px 0',
+                borderBottom: i < session.sequence.items.length - 1 ? '1px solid var(--border)' : 'none'
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{i + 1}. {item.name}</div>
+              {item.remarks && (
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>{item.remarks}</div>
+              )}
+              {item.reference_url && (
+                isLikelyUrl(item.reference_url) ? (
+                  <a
+                    href={item.reference_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: 12, wordBreak: 'break-all', display: 'inline-block', marginTop: 2 }}
+                  >
+                    Reference
+                  </a>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', wordBreak: 'break-word', marginTop: 2 }}>
+                    Reference: {item.reference_url}
+                  </div>
+                )
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {session.sequence?.google_sheet_link && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <a href={session.sequence.google_sheet_link} target="_blank" rel="noreferrer" style={{ fontSize: 14, wordBreak: 'break-all', color: 'var(--primary)' }}>
+            Open Google Sheet
+          </a>
+        </div>
+      )}
 
       <div className="form-group">
         <label className="label" htmlFor="session-notes">Session Notes</label>

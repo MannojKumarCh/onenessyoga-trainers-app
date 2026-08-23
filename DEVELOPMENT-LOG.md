@@ -486,6 +486,18 @@ Rather than touching the routing/precedence system (higher risk, affects every m
 
 ---
 
+## 28. Session Detail shows the full sequence content, not just the title (2026-08-23)
+
+§22 gave a session the day's sequence topic as its title, but Session Detail itself showed nothing else about the sequence - no exercise list, no instructions, no reference links, no Google Sheet. A trainer would see "Yin Yoga" as the title with no way to actually see what that meant, unless they separately went to the Sequences tab and happened to be the trainer it was assigned to.
+
+- New `getSequenceForDate(date)` in `backend/src/routes/sessions.js` - same date-only, irrespective-of-trainer matching as §22's title lookup, but fetches the full `Sequence` row plus its `SequenceItem`s (name, remarks, reference_url) instead of just the topic string. Only added to `GET /sessions/:id` (the single-session detail route) - the list routes still use the lightweight topic-only lookup, since fetching every item for every session in a list would be wasteful.
+- `SessionDetail.jsx` now renders an Instructions card and a Sequence Content card (numbered list, same look as the existing `SequenceDetail.jsx` page) whenever `session.sequence` is present, plus a Google Sheet link if one's been uploaded. Nothing renders when there's no sequence for that date, matching the "Daily Session" fallback.
+- Confirmed by explicit ask: this shows for **any** trainer viewing the session, not just whoever the sequence happens to be assigned to - consistent with §22's decision.
+
+Verified locally: a session on a date with no sequence returns `sequence: null` and shows none of the new UI; creating a sequence (with instructions + 2 items) for a *different* trainer than the session's own trainer immediately surfaces the full topic, instructions, and both items on that session's detail view.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).

@@ -50,6 +50,27 @@ async function getSequenceTopicByDate(dates) {
   return topicByDate;
 }
 
+// Full sequence content (instructions, items, sheet link) for a single
+// session's date - only used on the single-session detail route, since list
+// routes only need the lightweight topic string above. Same date-only,
+// irrespective-of-trainer matching as getSequenceTopicByDate.
+async function getSequenceForDate(date) {
+  const seq = await prisma.sequence.findFirst({
+    where: { scheduled_date: date },
+    orderBy: { id: 'asc' },
+    include: { items: { orderBy: { sort_order: 'asc' } } }
+  });
+  if (!seq) return null;
+  return {
+    id: seq.id,
+    topic: seq.topic,
+    instructions: seq.instructions,
+    google_sheet_link: seq.google_sheet_link,
+    status: seq.status,
+    items: seq.items
+  };
+}
+
 function serialize(session, topicByDate = new Map()) {
   const { assigned_trainer, backup_trainer, ...rest } = session;
   return {
@@ -143,8 +164,11 @@ router.get('/:id', authenticate, async (req, res) => {
   if (isTrainerOnly && !isParty) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  const topicByDate = await getSequenceTopicByDate([session.scheduled_date]);
-  res.json(serializeWithZoom(session, topicByDate));
+  const [topicByDate, sequence] = await Promise.all([
+    getSequenceTopicByDate([session.scheduled_date]),
+    getSequenceForDate(session.scheduled_date)
+  ]);
+  res.json({ ...serializeWithZoom(session, topicByDate), sequence });
 });
 
 // Admin: create session
