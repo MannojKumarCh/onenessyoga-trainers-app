@@ -6,6 +6,7 @@ const { notifyUser, notifyAll } = require('../utils/notify');
 const asyncHandler = require('../utils/asyncHandler');
 const { upsertSequenceInSheet } = require('../utils/sheets');
 const { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration, OpenRouterRateLimitError } = require('../utils/aiScheduler');
+const { ensureTrainerExists, ensureTrainersExist } = require('../utils/trainers');
 const validateIdParam = require('../middleware/validateIdParam');
 
 const aiScheduleLimiter = rateLimit({
@@ -40,17 +41,6 @@ function parsePositiveInt(value, fieldName) {
 function parseOptionalPositiveInt(value, fieldName) {
   if (value === undefined || value === null || value === '') return undefined;
   return parsePositiveInt(value, fieldName);
-}
-
-async function ensureTrainerExists(trainerId) {
-  const trainer = await prisma.user.findUnique({
-    where: { id: trainerId },
-    select: { id: true, roles: true }
-  });
-
-  if (!trainer || !trainer.roles.includes('trainer')) {
-    throw httpError(400, 'assigned_trainer_id must reference an existing trainer');
-  }
 }
 
 const MAX_BACKDATE_DAYS = 7;
@@ -171,15 +161,7 @@ router.post('/bulk', authenticate, requireRole('sequence_creator'), async (req, 
   }
 
   const trainerIds = sequences.map(s => parsePositiveInt(s.assigned_trainer_id, 'assigned_trainer_id'));
-  const uniqueTrainerIds = [...new Set(trainerIds)];
-
-  const trainers = await prisma.user.findMany({
-    where: { id: { in: uniqueTrainerIds }, roles: { has: 'trainer' } },
-    select: { id: true }
-  });
-  if (trainers.length !== uniqueTrainerIds.length) {
-    throw httpError(400, 'assigned_trainer_id must reference an existing trainer');
-  }
+  await ensureTrainersExist(trainerIds);
 
   const bulkIsSuperAdmin = getUserRoles(req.user).includes('super_admin');
   const data = sequences.map((s, i) => {

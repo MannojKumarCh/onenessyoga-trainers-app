@@ -4,6 +4,7 @@ const { authenticate, requireRole, getUserRoles } = require('../middleware/auth'
 const asyncHandler = require('../utils/asyncHandler');
 const { notifyUser, notifyUsers } = require('../utils/notify');
 const { sendBackupAssignedEmail } = require('../utils/mail');
+const { ensureTrainerExists } = require('../utils/trainers');
 const validateIdParam = require('../middleware/validateIdParam');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
@@ -26,21 +27,6 @@ function parseOptionalPositiveInt(value, fieldName) {
     throw httpError(400, `${fieldName} must be a positive integer`);
   }
   return parsed;
-}
-
-async function ensureTrainerExists(trainerId) {
-  if (trainerId === null) return null;
-
-  const trainer = await prisma.user.findUnique({
-    where: { id: trainerId },
-    select: { id: true, roles: true }
-  });
-
-  if (!trainer || !trainer.roles.includes('trainer')) {
-    throw httpError(400, 'assigned_trainer_id must reference an existing trainer');
-  }
-
-  return trainerId;
 }
 
 function serialize(session) {
@@ -164,39 +150,6 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
   res.status(201).json({ id: session.id });
 });
 
-// Admin: bulk create sessions (for week scheduling)
-router.post('/bulk', authenticate, requireRole('super_admin'), async (req, res) => {
-  const { sessions } = req.body;
-  if (!Array.isArray(sessions) || sessions.length === 0) return res.status(400).json({ error: 'sessions array required' });
-
-  const trainerIds = sessions.map(s => parseOptionalPositiveInt(s.assigned_trainer_id, 'assigned_trainer_id'));
-  const uniqueTrainerIds = [...new Set(trainerIds.filter(id => id !== null))];
-
-  const trainers = await prisma.user.findMany({
-    where: { id: { in: uniqueTrainerIds }, roles: { has: 'trainer' } },
-    select: { id: true }
-  });
-  if (trainers.length !== uniqueTrainerIds.length) {
-    throw httpError(400, 'assigned_trainer_id must reference an existing trainer');
-  }
-
-  const data = sessions.map((s, i) => ({
-    title: s.title || 'Daily Session',
-    scheduled_date: s.scheduled_date,
-    scheduled_time: s.scheduled_time,
-    session_type: s.session_type || 'BKP',
-    assigned_trainer_id: trainerIds[i],
-    zoom_link: s.zoom_link || null,
-    created_by: req.user.id
-  }));
-
-  await prisma.session.createMany({
-    data
-  });
-
-  res.status(201).json({ success: true, count: sessions.length });
-});
-
 // Admin: update session
 router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) => {
   const { title, scheduled_date, scheduled_time, session_type, assigned_trainer_id, zoom_link } = req.body;
@@ -290,7 +243,7 @@ router.patch('/:id/backup', authenticate, requireRole('super_admin'), async (req
   const session = await prisma.session.findUnique({ where: { id } });
   if (!session) return res.status(404).json({ error: 'Not found' });
 
-  const backupId = await ensureTrainerExists(parseOptionalPositiveInt(req.body.backup_trainer_id, 'backup_trainer_id'));
+  const backupId = await ensureTrainerExists(parseOptionalPositiveInt(req.body.backup_trainer_id, 'backup_trainer_id'), 'backup_trainer_id');
 
   if (backupId !== null && backupId === session.assigned_trainer_id) {
     throw httpError(400, 'Backup trainer must be different from the assigned trainer');

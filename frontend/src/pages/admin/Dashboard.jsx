@@ -22,7 +22,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { showToast } = useToast();
-  const { supported, permission, isEnabling, error: pushError, enablePushNotifications } = usePush(user);
+  const { supported, permission, isEnabling, enablePushNotifications } = usePush(user);
 
   const [stats, setStats] = useState(null);
   const [todaySessionsList, setTodaySessionsList] = useState([]);

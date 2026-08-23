@@ -5,6 +5,7 @@ import { ExclamationTriangleIcon, BellIcon } from '@heroicons/react/24/outline';
 import client from '../api/client';
 import usePolling from '../hooks/usePolling';
 import { useToast } from '../context/ToastContext';
+import { getApiErrorMessage } from '../utils/apiError';
 
 export default function Notifications() {
   const navigate = useNavigate();
@@ -31,9 +32,13 @@ export default function Notifications() {
   }
 
   async function markAllRead() {
-    await client.patch('/notifications/read-all').catch(() => {});
-    showToast('All Notifications Marked as Read');
-    load();
+    try {
+      await client.patch('/notifications/read-all');
+      showToast('All Notifications Marked as Read');
+      load();
+    } catch (err) {
+      showToast(getApiErrorMessage(err, 'Failed to mark all as read'), 'error');
+    }
   }
 
   return (

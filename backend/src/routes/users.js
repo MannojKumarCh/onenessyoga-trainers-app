@@ -67,11 +67,20 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
     if (rolesError) return res.status(400).json({ error: rolesError });
   }
 
+  let normalizedEmail = user.email;
+  if (email !== undefined) {
+    normalizedEmail = email.toLowerCase().trim();
+    if (normalizedEmail !== user.email) {
+      const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+      if (existing) return res.status(409).json({ error: 'Email already exists' });
+    }
+  }
+
   await prisma.user.update({
     where: { id },
     data: {
       name: name ?? user.name,
-      email: email ?? user.email,
+      email: normalizedEmail,
       roles: roles ?? user.roles,
       zoom_link: zoom_link ?? user.zoom_link,
       is_active: is_active !== undefined ? Boolean(is_active) : user.is_active

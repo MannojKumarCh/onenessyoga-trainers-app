@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { BellIcon } from '@heroicons/react/24/outline';
 import client from '../api/client';
 import { getApiErrorMessage } from '../utils/apiError';
+import usePolling from '../hooks/usePolling';
 
 export default function NotificationBell() {
   const navigate = useNavigate();
@@ -23,19 +24,7 @@ export default function NotificationBell() {
   useEffect(() => { refreshCount(); }, [location.pathname, refreshCount]);
 
   // Auto-refresh every 30 seconds + on visibility change
-  useEffect(() => {
-    const interval = setInterval(refreshCount, 30000);
-
-    function onVisibility() {
-      if (document.visibilityState === 'visible') refreshCount();
-    }
-    document.addEventListener('visibilitychange', onVisibility);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [refreshCount]);
+  usePolling(refreshCount, 30000);
 
   function toggleOpen() {
     if (!open) {

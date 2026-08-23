@@ -30,6 +30,11 @@ async function logSuccessfulGeneration(userId) {
   await prisma.aiScheduleLog.create({ data: { user_id: userId } });
 }
 
+// Deliberately a curated subset of the full topic list in
+// frontend/src/components/TopicSelect.jsx, not a mirror of it - the AI is
+// restricted to these because they're the topics with well-understood
+// sequencing rules (see RULES below). A topic that only exists in
+// TopicSelect (e.g. "Kids Yoga") is intentionally not AI-schedulable.
 const SESSION_TYPES = {
   'Regular Sessions': [
     'Chandra Namaskar + Yoga',
@@ -284,4 +289,4 @@ async function generateWeeklySchedule() {
   return { configured: true, week_start_date, days: schedule };
 }
 
-module.exports = { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration, SESSION_TYPES, DAILY_LIMIT, OpenRouterRateLimitError };
+module.exports = { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration, OpenRouterRateLimitError };

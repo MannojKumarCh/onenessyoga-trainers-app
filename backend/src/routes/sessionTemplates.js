@@ -4,6 +4,7 @@ const { authenticate, requireRole } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const validateIdParam = require('../middleware/validateIdParam');
 const { notifyUser } = require('../utils/notify');
+const { ensureTrainerExists } = require('../utils/trainers');
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
@@ -50,11 +51,7 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
       if (!Number.isInteger(parsed) || parsed <= 0) {
         throw httpError(400, 'dedicated_trainer_id must be a positive integer');
       }
-      const trainer = await prisma.user.findUnique({ where: { id: parsed }, select: { id: true, roles: true } });
-      if (!trainer || !trainer.roles.includes('trainer')) {
-        throw httpError(400, 'dedicated_trainer_id must reference an existing trainer');
-      }
-      trainerId = parsed;
+      trainerId = await ensureTrainerExists(parsed, 'dedicated_trainer_id');
     }
   }
 

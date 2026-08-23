@@ -4,6 +4,7 @@ import Modal from '../../components/Modal';
 import { ExclamationTriangleIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
+import { getApiErrorMessage } from '../../utils/apiError';
 
 export default function AdminLeaves() {
   const [leaves, setLeaves] = useState([]);
@@ -12,6 +13,8 @@ export default function AdminLeaves() {
   const [error, setError] = useState(false);
   const [reviewing, setReviewing] = useState(null);
   const [adminNote, setAdminNote] = useState('');
+  const [reviewError, setReviewError] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   const { showToast } = useToast();
 
@@ -26,11 +29,19 @@ export default function AdminLeaves() {
   usePolling(load, 30000);
 
   async function review(status) {
-    await client.patch(`/leaves/${reviewing.id}/review`, { status, admin_note: adminNote });
-    showToast(`Leave ${status.charAt(0).toUpperCase() + status.slice(1)} Successfully`);
-    setReviewing(null);
-    setAdminNote('');
-    load();
+    setReviewError('');
+    setReviewSubmitting(true);
+    try {
+      await client.patch(`/leaves/${reviewing.id}/review`, { status, admin_note: adminNote });
+      showToast(`Leave ${status.charAt(0).toUpperCase() + status.slice(1)} Successfully`);
+      setReviewing(null);
+      setAdminNote('');
+      load();
+    } catch (err) {
+      setReviewError(getApiErrorMessage(err, 'Failed to review leave'));
+    } finally {
+      setReviewSubmitting(false);
+    }
   }
 
   return (
@@ -67,7 +78,7 @@ export default function AdminLeaves() {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
             <span className={`badge badge-${l.status}`}>{l.status.charAt(0).toUpperCase() + l.status.slice(1)}</span>
             {l.status === 'pending' && (
-              <button className="btn btn-primary" style={{ fontSize: 12, padding: '4px 12px' }} onClick={() => { setReviewing(l); setAdminNote(''); }}>
+              <button className="btn btn-primary" style={{ fontSize: 12, padding: '4px 12px' }} onClick={() => { setReviewing(l); setAdminNote(''); setReviewError(''); }}>
                 Review
               </button>
             )}
@@ -83,10 +94,11 @@ export default function AdminLeaves() {
               <label className="label" htmlFor="admin-leave-note">Note (Optional)</label>
               <textarea id="admin-leave-note" className="input" rows={2} value={adminNote} onChange={e => setAdminNote(e.target.value)} placeholder="Reason for decision…" />
             </div>
+            {reviewError && <p className="error-text" style={{ marginBottom: 12 }}>{reviewError}</p>}
             <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setReviewing(null)}>Cancel</button>
-              <button className="btn btn-danger" style={{ flex: 1 }} onClick={() => review('rejected')}>Reject</button>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => review('approved')}>Approve</button>
+              <button className="btn btn-ghost" style={{ flex: 1 }} disabled={reviewSubmitting} onClick={() => setReviewing(null)}>Cancel</button>
+              <button className="btn btn-danger" style={{ flex: 1 }} disabled={reviewSubmitting} onClick={() => review('rejected')}>Reject</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} disabled={reviewSubmitting} onClick={() => review('approved')}>{reviewSubmitting ? 'Saving…' : 'Approve'}</button>
             </div>
         </Modal>
       )}
