@@ -52,7 +52,7 @@ Use the credentials below to log in as each role and confirm the app loads corre
 | Trainer | `trainer1@clowmail.com` | `Test1234!` |
 | Sequence Creator | `seqcre@guysmail.com` | `Test1234!` |
 
-> The trainer and sequence-creator passwords above were reset to a known test value for local verification (2026-07-19) — they were previously set to unknown values via the admin UI. The super admin password is the seed script default.
+> The trainer and sequence-creator passwords above were reset to a known test value for local verification (2026-07-19) — they were previously set to unknown values via the admin UI. The super admin password is whatever value was passed to `npm run seed -- <email> <password>` when this local DB was first seeded (the script requires an explicit password argument — there's no built-in default).
 
 ## 5. Suggested smoke test per role
 

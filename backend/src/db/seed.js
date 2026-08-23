@@ -3,8 +3,14 @@ const bcrypt = require('bcryptjs');
 const prisma = require('./db');
 
 const email = process.argv[2] || 'admin@oneness.yoga';
-const password = process.argv[3] || 'admin1234';
+const password = process.argv[3];
 const name = process.argv[4] || 'Super Admin';
+
+if (!password) {
+  console.error('Usage: npm run seed -- <email> <password> [name]');
+  console.error('A password must be provided explicitly - there is no default.');
+  process.exit(1);
+}
 
 async function main() {
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -19,7 +25,6 @@ async function main() {
   });
 
   console.log(`Created super_admin: ${email} (id: ${user.id})`);
-  console.log('Password:', password);
   console.log('CHANGE THIS PASSWORD after first login!');
 }
 
