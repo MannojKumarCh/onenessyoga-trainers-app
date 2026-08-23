@@ -9,6 +9,7 @@ const { authenticate } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const { notifyUsers } = require('../utils/notify');
 const { sendGoogleLinkPendingEmail, sendPasswordResetEmail } = require('../utils/mail');
+const { isValidWhatsappNumber } = require('../utils/phone');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -48,7 +49,7 @@ router.post('/login', loginLimiter, async (req, res) => {
 
   res.json({
     token,
-    user: { id: user.id, name: user.name, email: user.email, roles: user.roles, zoom_link: user.zoom_link, must_change_password: user.must_change_password }
+    user: { id: user.id, name: user.name, email: user.email, roles: user.roles, zoom_link: user.zoom_link, whatsapp_number: user.whatsapp_number, must_change_password: user.must_change_password }
   });
 });
 
@@ -123,7 +124,7 @@ router.post('/google', loginLimiter, async (req, res) => {
 
   res.json({
     token,
-    user: { id: user.id, name: user.name, email: user.email, roles: user.roles, zoom_link: user.zoom_link, must_change_password: user.must_change_password }
+    user: { id: user.id, name: user.name, email: user.email, roles: user.roles, zoom_link: user.zoom_link, whatsapp_number: user.whatsapp_number, must_change_password: user.must_change_password }
   });
 });
 
@@ -176,23 +177,29 @@ router.post('/reset-password', async (req, res) => {
 router.get('/me', authenticate, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user.id },
-    select: { id: true, name: true, email: true, roles: true, zoom_link: true, created_at: true, must_change_password: true }
+    select: { id: true, name: true, email: true, roles: true, zoom_link: true, whatsapp_number: true, created_at: true, must_change_password: true }
   });
   res.json(user);
 });
 
 router.put('/me', authenticate, async (req, res) => {
-  const { name, zoom_link } = req.body;
+  const { name, zoom_link, whatsapp_number } = req.body;
+
+  if (whatsapp_number && !isValidWhatsappNumber(whatsapp_number)) {
+    return res.status(400).json({ error: 'WhatsApp number must include the country code, e.g. +919876543210' });
+  }
+
   // Fetch from the DB rather than trusting req.user (the JWT payload never
-  // carried zoom_link at all, so req.user.zoom_link was always undefined -
-  // meaning every call here previously wiped zoom_link to null whenever the
-  // caller didn't resend it).
+  // carried zoom_link/whatsapp_number at all, so those would always be
+  // undefined on req.user - meaning every call here would otherwise wipe
+  // them to null whenever the caller didn't resend the current value).
   const user = await prisma.user.findUnique({ where: { id: req.user.id } });
   await prisma.user.update({
     where: { id: req.user.id },
     data: {
       name: name || user.name,
-      zoom_link: zoom_link !== undefined ? zoom_link : user.zoom_link
+      zoom_link: zoom_link !== undefined ? zoom_link : user.zoom_link,
+      whatsapp_number: whatsapp_number !== undefined ? whatsapp_number : user.whatsapp_number
     }
   });
   res.json({ success: true });

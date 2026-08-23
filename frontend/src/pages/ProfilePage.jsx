@@ -35,6 +35,7 @@ export default function ProfilePage() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [name, setName] = useState(user.name);
   const [zoomLink, setZoomLink] = useState(user.zoom_link || '');
+  const [whatsappNumber, setWhatsappNumber] = useState(user.whatsapp_number || '');
   const [profileError, setProfileError] = useState('');
   const [profileSubmitting, setProfileSubmitting] = useState(false);
 
@@ -54,6 +55,7 @@ export default function ProfilePage() {
   function openEditProfile() {
     setName(user.name);
     setZoomLink(user.zoom_link || '');
+    setWhatsappNumber(user.whatsapp_number || '');
     setProfileError('');
     setEditingProfile(true);
   }
@@ -76,10 +78,14 @@ export default function ProfilePage() {
   async function saveProfile(e) {
     e.preventDefault();
     setProfileError('');
+    if (whatsappNumber && !/^\+[1-9]\d{6,14}$/.test(whatsappNumber)) {
+      setProfileError('WhatsApp number must include the country code, e.g. +919876543210');
+      return;
+    }
     setProfileSubmitting(true);
     try {
-      await client.put('/auth/me', { name, zoom_link: zoomLink || null });
-      updateUser({ name, zoom_link: zoomLink || null });
+      await client.put('/auth/me', { name, zoom_link: zoomLink || null, whatsapp_number: whatsappNumber || null });
+      updateUser({ name, zoom_link: zoomLink || null, whatsapp_number: whatsappNumber || null });
       showToast('Profile Updated');
       setEditingProfile(false);
     } catch (err) {
@@ -143,6 +149,11 @@ export default function ProfilePage() {
               <label className="label" htmlFor="profile-zoom">Zoom Link</label>
               <input id="profile-zoom" className="input" type="url" placeholder="https://us06web.zoom.us/j/…" value={zoomLink} onChange={e => setZoomLink(e.target.value)} />
             </div>
+            <div className="form-group">
+              <label className="label" htmlFor="profile-whatsapp">WhatsApp Number</label>
+              <input id="profile-whatsapp" className="input" type="tel" placeholder="+919876543210" value={whatsappNumber} onChange={e => setWhatsappNumber(e.target.value)} />
+              <p className="hint-text">Include the country code (e.g. +91 for India)</p>
+            </div>
             {profileError && <p className="error-text" style={{ marginBottom: 12 }}>{profileError}</p>}
             <div style={{ display: 'flex', gap: 10 }}>
               <button type="button" className="btn btn-ghost" style={{ flex: 1 }} disabled={profileSubmitting} onClick={() => setEditingProfile(false)}>Cancel</button>
@@ -156,6 +167,7 @@ export default function ProfilePage() {
             <DetailRow label="Name" value={user.name} />
             <DetailRow label="Roles" value={user.roles.map(formatRole).join(', ')} />
             <DetailRow label="Zoom Link" value={user.zoom_link || '—'} />
+            <DetailRow label="WhatsApp Number" value={user.whatsapp_number || '—'} />
           </>
         )}
       </div>

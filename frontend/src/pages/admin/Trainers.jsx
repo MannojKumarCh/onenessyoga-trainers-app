@@ -11,7 +11,7 @@ import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 
 const ROLE_OPTIONS = ['trainer', 'sequence_creator', 'super_admin'];
-const EMPTY = { name: '', email: '', password: '', roles: ['trainer'], zoom_link: '' };
+const EMPTY = { name: '', email: '', password: '', roles: ['trainer'], zoom_link: '', whatsapp_number: '' };
 
 export default function AdminTrainers() {
   const { user: currentUser } = useAuth();
@@ -49,7 +49,7 @@ export default function AdminTrainers() {
   function openAdd() { setEditing(null); setForm(EMPTY); setDefaultSlotIds([]); setError(''); setShowForm(true); }
   function openEdit(u) {
     setEditing(u);
-    setForm({ name: u.name, email: u.email, password: '', roles: u.roles, zoom_link: u.zoom_link || '' });
+    setForm({ name: u.name, email: u.email, password: '', roles: u.roles, zoom_link: u.zoom_link || '', whatsapp_number: u.whatsapp_number || '' });
     setDefaultSlotIds(templates.filter(t => t.dedicated_trainer_id === u.id).map(t => t.id));
     setError('');
     setShowForm(true);
@@ -70,7 +70,7 @@ export default function AdminTrainers() {
     setSubmitting(true);
     try {
       if (editing) {
-        await client.put(`/users/${editing.id}`, { name: form.name, email: form.email, roles: form.roles, zoom_link: form.zoom_link });
+        await client.put(`/users/${editing.id}`, { name: form.name, email: form.email, roles: form.roles, zoom_link: form.zoom_link, whatsapp_number: form.whatsapp_number });
         const previousIds = templates.filter(t => t.dedicated_trainer_id === editing.id).map(t => t.id);
         await applyDefaultSlots(editing.id, previousIds);
       } else {
@@ -268,6 +268,11 @@ export default function AdminTrainers() {
               <div className="form-group">
                 <label className="label" htmlFor="trainer-zoom">Zoom Link</label>
                 <input id="trainer-zoom" className="input" type="url" value={form.zoom_link} placeholder="https://us06web.zoom.us/j/…" onChange={e => setForm(f => ({ ...f, zoom_link: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label className="label" htmlFor="trainer-whatsapp">WhatsApp Number</label>
+                <input id="trainer-whatsapp" className="input" type="tel" value={form.whatsapp_number} placeholder="+919876543210" onChange={e => setForm(f => ({ ...f, whatsapp_number: e.target.value }))} />
+                <p className="hint-text">Include the country code (e.g. +91 for India)</p>
               </div>
               {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
               <div style={{ display: 'flex', gap: 10 }}>

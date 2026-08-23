@@ -452,6 +452,18 @@ Verified locally: updating just the name via `PUT /auth/me` leaves an existing z
 
 ---
 
+## 25. WhatsApp number field, for future WhatsApp integration (2026-08-23)
+
+New `User.whatsapp_number` (nullable string), required to be in E.164 format (`+` + country code + number, e.g. `+919876543210`) - validated by a shared `backend/src/utils/phone.js` (`isValidWhatsappNumber`), enforced on every write path: self-service `PUT /auth/me`, and admin's `POST /users` / `PUT /users/:id`. Stored in E.164 specifically so it can be used as-is by a WhatsApp Business API integration later, without a reformatting step.
+
+- `ProfilePage.jsx`'s Profile section now has a WhatsApp Number field (view + edit), alongside name and Zoom link.
+- Admin's Add/Edit Trainer form (`Trainers.jsx`) also has it, mirroring how Zoom Link is already admin-manageable there.
+- Included in the `GET /auth/me` response and the `user` object returned by login/Google sign-in, so `AuthContext` has it available immediately without an extra fetch.
+
+Verified locally: `PUT /auth/me` and admin's `POST /users` both reject a number without a country code (e.g. `9876543210`, `12345`) with a 400, accept a valid E.164 number, and a follow-up `PUT /auth/me` sending only `name` leaves the WhatsApp number untouched (same DB-read-before-write fix from §24, now applied to this field too).
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).

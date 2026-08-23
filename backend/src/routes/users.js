@@ -6,6 +6,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { sendWelcomeEmail, sendGoogleLinkDecisionEmail } = require('../utils/mail');
 const { notifyUser } = require('../utils/notify');
 const { shareSpreadsheetWithTrainer } = require('../utils/sheets');
+const { isValidWhatsappNumber } = require('../utils/phone');
 const validateIdParam = require('../middleware/validateIdParam');
 
 ['get', 'post', 'put', 'patch', 'delete'].forEach(method => {
@@ -27,7 +28,7 @@ function validateRoles(roles) {
 // Admin: list all trainers
 router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, roles: true, zoom_link: true, is_active: true, google_link_status: true, created_at: true },
+    select: { id: true, name: true, email: true, roles: true, zoom_link: true, whatsapp_number: true, is_active: true, google_link_status: true, created_at: true },
     orderBy: { name: 'asc' }
   });
   res.json(users);
@@ -35,11 +36,14 @@ router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
 
 // Admin: create user
 router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
-  const { name, email, password, roles, zoom_link } = req.body;
+  const { name, email, password, roles, zoom_link, whatsapp_number } = req.body;
   if (!name || !email || !password || !roles) return res.status(400).json({ error: 'name, email, password, roles required' });
   const rolesError = validateRoles(roles);
   if (rolesError) return res.status(400).json({ error: rolesError });
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  if (whatsapp_number && !isValidWhatsappNumber(whatsapp_number)) {
+    return res.status(400).json({ error: 'WhatsApp number must include the country code, e.g. +919876543210' });
+  }
 
   const normalizedEmail = email.toLowerCase().trim();
   const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
@@ -47,7 +51,7 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
 
   const hash = await bcrypt.hash(password, 10);
   const user = await prisma.user.create({
-    data: { name: name.trim(), email: normalizedEmail, password_hash: hash, roles, zoom_link: zoom_link || null, must_change_password: true }
+    data: { name: name.trim(), email: normalizedEmail, password_hash: hash, roles, zoom_link: zoom_link || null, whatsapp_number: whatsapp_number || null, must_change_password: true }
   });
 
   await sendWelcomeEmail(user).catch(err => console.error('Failed to send welcome email:', err));
@@ -57,7 +61,7 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
 
 // Admin: update user
 router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) => {
-  const { name, email, roles, zoom_link, is_active } = req.body;
+  const { name, email, roles, zoom_link, whatsapp_number, is_active } = req.body;
   const id = parseInt(req.params.id);
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return res.status(404).json({ error: 'User not found' });
@@ -65,6 +69,10 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
   if (roles !== undefined) {
     const rolesError = validateRoles(roles);
     if (rolesError) return res.status(400).json({ error: rolesError });
+  }
+
+  if (whatsapp_number && !isValidWhatsappNumber(whatsapp_number)) {
+    return res.status(400).json({ error: 'WhatsApp number must include the country code, e.g. +919876543210' });
   }
 
   let normalizedEmail = user.email;
@@ -83,6 +91,7 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
       email: normalizedEmail,
       roles: roles ?? user.roles,
       zoom_link: zoom_link ?? user.zoom_link,
+      whatsapp_number: whatsapp_number ?? user.whatsapp_number,
       is_active: is_active !== undefined ? Boolean(is_active) : user.is_active
     }
   });

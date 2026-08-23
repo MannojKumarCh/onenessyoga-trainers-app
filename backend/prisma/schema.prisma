@@ -43,6 +43,7 @@ model User {
   must_change_password Boolean        @default(false)
   roles              Role[]
   zoom_link          String?
+  whatsapp_number    String?
   is_active          Boolean          @default(true)
   google_id          String?          @unique
   google_link_status GoogleLinkStatus @default(none)
