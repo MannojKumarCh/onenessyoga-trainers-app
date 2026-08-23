@@ -21,6 +21,14 @@ function TemplateRow({ template, trainers, onSaved }) {
     || form.is_active !== template.is_active;
 
   async function save() {
+    const nextTrainerId = form.dedicated_trainer_id ? Number(form.dedicated_trainer_id) : null;
+    if (nextTrainerId && template.dedicated_trainer_id && nextTrainerId !== template.dedicated_trainer_id) {
+      const nextName = trainers.find(t => t.id === nextTrainerId)?.name || 'this trainer';
+      const confirmed = window.confirm(
+        `${template.label} is currently defaulted to ${template.dedicated_trainer_name}. Reassign the default to ${nextName}? This won't change sessions already generated for other trainers.`
+      );
+      if (!confirmed) return;
+    }
     setSaving(true);
     setError('');
     try {

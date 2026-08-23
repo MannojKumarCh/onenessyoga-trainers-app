@@ -264,8 +264,11 @@ export default function AdminSessions() {
       {assignFor && (
         <Modal title="Assign Trainer" onClose={() => setAssignFor(null)}>
           <form onSubmit={submitAssign}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 8 }}>
               {assignFor.title} · {assignFor.scheduled_date} at {assignFor.scheduled_time}
+            </p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 16 }}>
+              This only changes the trainer for this one session. To change who's assigned by default for every future {assignFor.scheduled_time} session, use the Weekly Schedule tab or the trainer's Default Sessions on the Trainers screen.
             </p>
             <div className="form-group">
               <label className="label" htmlFor="assign-trainer">Trainer</label>

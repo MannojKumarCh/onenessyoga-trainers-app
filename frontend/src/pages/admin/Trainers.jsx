@@ -246,7 +246,15 @@ export default function AdminTrainers() {
                         <input
                           type="checkbox"
                           checked={defaultSlotIds.includes(t.id)}
-                          onChange={e => setDefaultSlotIds(ids => e.target.checked ? [...ids, t.id] : ids.filter(id => id !== t.id))}
+                          onChange={e => {
+                            if (e.target.checked && t.dedicated_trainer_id && t.dedicated_trainer_id !== editing?.id) {
+                              const confirmed = window.confirm(
+                                `${t.label} is currently defaulted to ${t.dedicated_trainer_name}. Reassign the default to ${form.name || 'this trainer'}? This won't change sessions already generated for ${t.dedicated_trainer_name}.`
+                              );
+                              if (!confirmed) return;
+                            }
+                            setDefaultSlotIds(ids => e.target.checked ? [...ids, t.id] : ids.filter(id => id !== t.id));
+                          }}
                         />
                         {t.label}
                         {t.dedicated_trainer_id && t.dedicated_trainer_id !== editing?.id && (
