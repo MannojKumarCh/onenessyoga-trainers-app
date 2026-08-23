@@ -2,7 +2,7 @@
 
 A living record of features and fixes implemented via Claude Code sessions. Update this file as work continues; don't let it go stale.
 
-Last updated: 2026-07-28
+Last updated: 2026-08-23
 
 ---
 
@@ -314,6 +314,50 @@ Separately, Super Admin can now assign a **backup trainer** to any individual se
 **Caught and fixed in passing**: `sessions.js`'s `PATCH /:id/complete` and `PATCH /:id/notes` handlers called `notifyUsers(...)` without it ever being imported (only `notifyUser` was) - a pre-existing `ReferenceError` that would have thrown every time a trainer completed a session or added notes, silently swallowed by the route's existing `asyncHandler` wrapper turning it into a 500. Fixed as part of this pass since both handlers were already being touched for the backup-trainer ownership check.
 
 Verified end-to-end against the local dev DB: migration applied cleanly, all 8 template rows seeded and returned correctly split into Mon–Fri/Saturday groups, generator produces exactly the right slots per weekday (Sundays skipped, Saturday gets only its 2) and is a true no-op on a second run, `is_active: false` correctly excludes a slot from future generation, `PATCH /:id/backup` rejects `backup_trainer_id === assigned_trainer_id`, notification rows created for both parties, and access-control checks (`GET /:id`, notes, complete) pass for the backup trainer and correctly 403 for an unrelated third trainer. `npm run build` clean. **One live-testing note**: `RESEND_API_KEY` was configured in the local `.env` used for this verification, and the two test trainer accounts happened to have real inboxes (per earlier notes in this log) - so two real "Backup Trainer Assignment" emails went out about a fake test session during verification. Caught immediately and no further email-triggering tests were run locally; flagged to the user at the time.
+
+---
+
+## 15. Default trainer assignment + per-session Assign action (2026-08-23)
+
+Two gaps surfaced once §14's recurring schedule was actually used: newly-generated sessions had no trainer at all until someone manually set one, and there was no way to change the trainer on an already-generated session (only at creation time, and templates only affect future generation, not existing rows).
+
+- **Per-session override**: a new "Assign" button on the admin Sessions list (`frontend/src/pages/admin/Sessions.jsx`), using the existing `PUT /sessions/:id`, for one-off corrections to an already-generated session.
+- **Default trainer assignment**: each trainer's edit/add form on the Trainers screen (`frontend/src/pages/admin/Trainers.jsx`) now lists the 8 schedule slots as a "Default Sessions" checklist, writing straight to `SessionTemplate.dedicated_trainer_id` (the same field the Weekly Schedule tab edits). Setting a slot's default trainer (from either screen) now **automatically backfills** any already-generated sessions for that slot that are still Unassigned (`backend/src/routes/sessionTemplates.js`'s `PUT /:id`) — it only fills genuine gaps (`assigned_trainer_id: null`), never touches a session that already has someone assigned, so the "template edits don't retroactively change existing sessions" rule from §14 still holds for anything that was ever explicitly assigned.
+- Both the Weekly Schedule tab and the Trainers screen's checklist now show a `window.confirm()` before reassigning a slot's default away from whoever currently holds it, and the per-session Assign modal now states explicitly it only affects that one session — added after initial confusion about why a default-trainer change "didn't seem to do anything" (traced to a missing confirmation, not a persistence bug — verified directly against the live dev DB that the reassignment itself was always working).
+
+Verified locally and against the live dev DB: backfill correctly fills only null `assigned_trainer_id` rows and leaves already-assigned ones untouched across a simulated two-step reassignment.
+
+---
+
+## 16. Real app icon and logo (2026-08-23)
+
+Replaced the placeholder lotus-emoji favicon/PWA icon with the real Oneness Yoga logo. The uploaded logo (coral background, "ONENESS YOGA" wordmark, lotus/meditating-figure mark) is a single square image, so different crops were used for different display sizes:
+
+- **Favicon / PWA install icon / apple-touch-icon**: cropped to just the lotus/figure mark (no text) — generated with `sharp` (new frontend devDependency) at 64×64, 180×180, 192×192, and 512×512 from the source image, replacing the old hand-written SVGs in `frontend/public/` and the `manifest.icons` entries in `vite.config.js`.
+- **Login page and app header**: use the full logo (with wordmark), per explicit request, since it reads fine at the login page's 72px size. The header icon had to be enlarged from the emoji's original 26px to 44px (the largest that fits the 52px header) since the full logo's text was illegible at 26px — checked by literally rendering the image at both candidate sizes before picking one, not by guessing.
+
+The full-resolution source logo lives at `frontend/public/oneness-yoga-logo.png`, downscaled to 300×300 (it's never displayed larger than 72px) to keep it light.
+
+---
+
+## 17. Code-health review and fixes (2026-08-23)
+
+Ran the `code-health-reviewer` agent for a full (not diff) codebase audit — report at `Agent Reviews/Code-Health-Reviewer/code-health-reviewer_2026-08-23_10-17-29.md` (19 findings: 4 High, 9 Medium, 6 Low). Fixed the real bugs, dead code, and safe/contained refactors; deliberately left the larger structural duplication (see below) untouched.
+
+**Fixed:**
+- Removed dead `POST /api/sessions/bulk` (no caller anywhere — superseded by §14's generator).
+- Extracted duplicated trainer-existence validation (`sessions.js`, `sequences.js`, `sessionTemplates.js`) into `backend/src/utils/trainers.js`.
+- Collapsed `mail.js`'s four repeated "resend not configured" guard + send blocks into one `sendEmail()` helper.
+- Fixed `PUT /users/:id`: unlike `POST /users`, it never lowercased/trimmed the email or checked for an existing duplicate — an admin could create a case-variant duplicate account that becomes permanently unreachable at login (since `auth.js` always lowercases on sign-in), or hit a raw unhandled Prisma unique-constraint error instead of a friendly 409.
+- Dropped 2 unused exports from `aiScheduler.js`; documented that its topic list is a deliberate subset of `TopicSelect.jsx`'s full list (tied to the AI's sequencing rules), not an oversight to "fix" by duplicating it.
+- `admin/Leaves.jsx`'s `review()` had no try/catch, unlike every sibling mutation handler — a failed review request left the modal stuck open with no feedback.
+- `Notifications.jsx`'s `markAllRead()` showed a success toast unconditionally, even when the request failed.
+- `NotificationBell.jsx` now uses the existing `usePolling` hook instead of its own hand-rolled interval + visibilitychange listener.
+- Bumped `axios` 1.17.0 → 1.19.0 via `npm audit fix` (in-range, no breaking change) — fixes 10 high-severity advisories.
+
+**Deliberately not touched** (real findings, but bigger refactors or the removal date hasn't arrived — not urgent bugs): duplicated `AdminSequences.jsx`/`sequence-creator/Sequences.jsx` page components (~85% shared code), duplicated Assign/Backup modal logic in `admin/Sessions.jsx`, duplicated breadcrumb/folder-browsing logic between `admin/Resources.jsx` and `trainer/Resources.jsx`, a generic relation-flattening serialization helper, the `resources.js` breadcrumb N+1 query pattern, the legacy singular-role JWT fallback in `auth.js` (self-documented removal date of 2026-08-27 hadn't passed yet), and major dependency version bumps (`bcryptjs`, `dotenv`, `google-auth-library`, and the `vite`/`react-router` bumps `npm audit fix --force` would require).
+
+Verified locally before deploying: all trainer-validation call sites still 400 on an invalid trainer id and succeed on a valid one, the dead route 404s, the email-uniqueness fix correctly rejects exact and case-variant duplicates while a same-email or unrelated-field update still succeeds, both frontend and backend builds clean.
 
 ---
 
