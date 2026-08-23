@@ -51,12 +51,11 @@ export default function LoginPage() {
         <div style={{ textAlign: 'center', marginBottom: 44 }}>
           <div style={{
             width: 72, height: 72, borderRadius: 20,
-            background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 20px', fontSize: 36,
+            margin: '0 auto 20px', overflow: 'hidden',
             boxShadow: '0 8px 24px rgba(232, 97, 77, 0.3)'
           }}>
-            🧘
+            <img src="/oneness-yoga-logo.png" alt="Oneness Yoga" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em' }}>Oneness Yoga</h1>
           <p style={{ color: 'var(--text-secondary)', marginTop: 8, fontSize: 15 }}>Sign In To Continue</p>

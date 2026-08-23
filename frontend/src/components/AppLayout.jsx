@@ -16,7 +16,7 @@ export default function AppLayout() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="app-header">
         <div className="app-header-title">
-          <span>🧘</span>
+          <img src="/oneness-yoga-logo.png" alt="Oneness Yoga" style={{ width: 44, height: 44, borderRadius: 9, objectFit: 'cover' }} />
           <span>Oneness Yoga</span>
           <span style={{ fontWeight: 400, opacity: 0.8, fontSize: 13 }}>{roleLabel}</span>
         </div>
