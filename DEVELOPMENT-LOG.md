@@ -361,6 +361,22 @@ Verified locally before deploying: all trainer-validation call sites still 400 o
 
 ---
 
+## 18. Prod deployment: `main` caught up to `dev` (2026-08-23)
+
+`main` had been frozen at `209726c` (the initial Contabo deployment) since 2026-07-19 while all of §9 through §17 shipped to dev-only — 31 commits, 118 files. Merged `dev` into `main` (clean fast-forward, no divergent commits) and deployed the whole span to prod in one pass, at the user's explicit request:
+
+1. `pg_dump` backup of the prod DB taken first (`oneness_trainers_prod_pre_main_merge_<timestamp>.sql` on the VM).
+2. `git checkout main && git pull` on `/opt/oneness-yoga/prod`.
+3. `npx prisma migrate deploy` applied the 3 migrations prod was missing (`add_ai_schedule_logs`, `add_multi_role_support`, `add_session_templates_and_backup_trainer`) cleanly.
+4. Seeded the 8 fixed weekly-schedule slots (same seed used for dev in §14) — prod's `session_templates` table was empty since the feature had never run there.
+5. Backend + frontend `npm install`, `npx prisma generate`, `npm run build`, `pm2 restart oneness-yoga-prod-api`.
+
+Verified against the live prod domain (`trainers.onenessyoga.in`) after restart: frontend serving the correct new bundle (checked for the "Default Sessions" string), `GET /api/session-templates` reachable and correctly 401s without auth, `POST /api/sessions/bulk` now 404s (dead route removed, confirmed on both dev and prod), and the session generator's startup run populated 64 real `Session` rows for the rolling 14-day window on the first boot (confirmed via `psql` row count) - matching dev's behavior exactly.
+
+**Known gap carried over to prod**: `OPENROUTER_API_KEY`/`OPENROUTER_MODEL` are not set in prod's `.env` (dev has them), so the AI weekly-schedule generator (§9) is live in code but returns `503 AI scheduling is not configured yet` on prod until those are added - it fails gracefully, not a crash. Every other feature shipped since `main`'s last update (multi-role support, AI scheduler *infrastructure*, sequence-builder + Sheets sync improvements, session-type thumbnails, install-to-home-screen button, responsive modals, recurring schedule + backup trainer, default trainer assignment, the real app icon, and the code-health fixes in §15-17) is now live on prod using the same production `RESEND_API_KEY`/Google credentials/DB already configured there — meaning email sends (welcome, Google-link, backup-assignment) now go to real prod users, as intended for a production environment.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).
@@ -377,5 +393,6 @@ All 4 dev accounts (`admin@oneness.yoga` / super_admin, `devseqcre@guysmail.com`
 4. ~~Minor pre-existing findings from the original agent reviews~~ — **done** (see §7): dependency version bumps (React 18→19, Express 4→5, Prisma 6→7), `parseInt` NaN validation on route params, N+1 query in bulk session creation, no DB connect timeout, no startup env-var validation. Remaining low-severity UX polish items not yet revisited — full detail in `Agent Reviews/`.
 5. ~~DNS, dev Google Drive folder, OAuth Console origins~~ — **done** (see §8). Both `trainers.onenessyoga.in` and `tdev.onenessyoga.in` are live over HTTPS. Still open: no browser-level verification yet (PWA/push/Google Sign-In), no prod admin account seeded.
 6. ~~Add `OPENROUTER_API_KEY`~~ — **done**, key is live on dev, real generations working (see §9). Sequence Creator can now also turn a generated plan directly into real sequences (`POST /sequences/bulk`). Still open: a live browser/DOM click-through of the editable AI-plan modal (Playwright unavailable in-session throughout), and validating `google/gemma-4-31b-it:free`'s real output quality specifically (blocked by transient free-tier provider throttling at time of writing — `nvidia/nemotron-3-ultra-550b-a55b:free` is currently configured instead, already validated).
-7. **Not started**: prod deployment of everything in §9 (AI scheduler + bulk-create) — `main` branch is behind `dev` and prod has intentionally not been touched since dev-first verification began (see §8).
-8. **Not started**: prod deployment of multi-role support (§10) — dev only so far, per the same dev-first policy. **Not yet verified**: live browser/DOM check of the merged nav for a multi-role account (Playwright unavailable in-session).
+7. ~~Not started: prod deployment of everything in §9 (AI scheduler + bulk-create)~~ — **done** (see §18). AI scheduler *code* is live on prod, but `OPENROUTER_API_KEY`/`OPENROUTER_MODEL` still need to be added to prod's `.env` before it's actually usable there (fails gracefully with a 503 until then).
+8. ~~Not started: prod deployment of multi-role support (§10)~~ — **done** (see §18), live on prod. **Still not yet verified**: live browser/DOM check of the merged nav for a multi-role account (Playwright unavailable in-session).
+9. **Action needed from user**: add `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` to prod's `.env` and restart `oneness-yoga-prod-api` to activate the AI weekly-schedule generator there (see §18).
