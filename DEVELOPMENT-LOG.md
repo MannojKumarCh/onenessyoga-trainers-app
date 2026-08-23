@@ -402,6 +402,8 @@ This is a frontend-enforced gate, not a backend-enforced one - the API itself do
 
 Verified locally end-to-end: a freshly admin-created account logs in with `must_change_password: true`; changing the password via the new endpoint flips it to `false` and a fresh login confirms it; a super_admin resetting that same user's password flips it back to `true`, proving the flag correctly re-arms on every admin-initiated credential handout, not just at account creation.
 
+**Bug found in user testing, fixed same day**: entering the wrong current password on the new `ChangePasswordPage` didn't show an error - it silently kicked the user back to the login screen instead (password correctly left unchanged, but with no explanation why). Root cause: `PUT /auth/me/password` returned `401` for "current password is incorrect," but `frontend/src/api/client.js`'s global axios interceptor treats *any* `401` as "the session/token is invalid" and force-logs-out to `/login` - it has no way to distinguish that from a plain wrong-value-in-a-field error, since by definition the request was already authenticated (the JWT itself was fine). Changed the status to `400`, consistent with every other validation failure in that same handler ("Both passwords required", "Password must be at least 8 characters"). Verified: wrong current password now returns 400, the password is left unchanged, and the account's real password still logs in correctly - the interceptor never fires, so the user now sees the actual error message and stays on the page to retry.
+
 ---
 
 ## Dev environment data reset (2026-08-20)

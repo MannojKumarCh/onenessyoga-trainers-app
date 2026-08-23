@@ -197,7 +197,12 @@ router.put('/me/password', authenticate, async (req, res) => {
 
   const user = await prisma.user.findUnique({ where: { id: req.user.id } });
   if (!(await bcrypt.compare(current_password, user.password_hash))) {
-    return res.status(401).json({ error: 'Current password is incorrect' });
+    // 400, not 401 - the request is fully authenticated (the JWT is valid);
+    // this is a validation failure on the current_password field, not a
+    // session problem. A 401 here would trigger the global axios
+    // interceptor's auto-logout-to-/login behavior, kicking the user out
+    // instead of letting them just retry the field.
+    return res.status(400).json({ error: 'Current password is incorrect' });
   }
 
   const hash = await bcrypt.hash(new_password, 10);
