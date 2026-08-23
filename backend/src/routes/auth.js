@@ -183,11 +183,38 @@ router.get('/me', authenticate, async (req, res) => {
 
 router.put('/me', authenticate, async (req, res) => {
   const { name, zoom_link } = req.body;
+  // Fetch from the DB rather than trusting req.user (the JWT payload never
+  // carried zoom_link at all, so req.user.zoom_link was always undefined -
+  // meaning every call here previously wiped zoom_link to null whenever the
+  // caller didn't resend it).
+  const user = await prisma.user.findUnique({ where: { id: req.user.id } });
   await prisma.user.update({
     where: { id: req.user.id },
-    data: { name: name || req.user.name, zoom_link: zoom_link ?? null }
+    data: {
+      name: name || user.name,
+      zoom_link: zoom_link !== undefined ? zoom_link : user.zoom_link
+    }
   });
   res.json({ success: true });
+});
+
+router.put('/me/email', authenticate, async (req, res) => {
+  const { current_password, new_email } = req.body;
+  if (!current_password || !new_email) return res.status(400).json({ error: 'Current password and new email are required' });
+
+  const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+  if (!(await bcrypt.compare(current_password, user.password_hash))) {
+    return res.status(400).json({ error: 'Current password is incorrect' });
+  }
+
+  const normalizedEmail = new_email.toLowerCase().trim();
+  if (normalizedEmail !== user.email) {
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (existing) return res.status(409).json({ error: 'Email already exists' });
+  }
+
+  await prisma.user.update({ where: { id: req.user.id }, data: { email: normalizedEmail } });
+  res.json({ success: true, email: normalizedEmail });
 });
 
 router.put('/me/password', authenticate, async (req, res) => {

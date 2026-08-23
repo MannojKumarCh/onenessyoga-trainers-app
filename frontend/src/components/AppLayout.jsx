@@ -5,7 +5,7 @@ import NotificationBell from './NotificationBell';
 import InstallAppButton from './InstallAppButton';
 import { buildNav } from '../config/nav';
 import { formatRole } from '../utils/formatRole';
-import { ArrowRightStartOnRectangleIcon } from '@heroicons/react/24/outline';
+import { ArrowRightStartOnRectangleIcon, UserCircleIcon } from '@heroicons/react/24/outline';
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
@@ -23,6 +23,9 @@ export default function AppLayout() {
         <div className="app-header-actions">
           <InstallAppButton variant="icon" />
           <NotificationBell />
+          <Link to="/profile" className="header-icon-btn" aria-label="My Profile" title="My Profile">
+            <UserCircleIcon style={{ width: 21, height: 21 }} />
+          </Link>
           <button onClick={logout} className="header-icon-btn" aria-label="Logout" title="Logout">
             <ArrowRightStartOnRectangleIcon style={{ width: 20, height: 20 }} />
           </button>

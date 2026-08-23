@@ -23,6 +23,7 @@ import AdminSequences from './pages/admin/Sequences';
 import AdminResources from './pages/admin/Resources';
 import CreatorSequences from './pages/sequence-creator/Sequences';
 import Notifications from './pages/Notifications';
+import ProfilePage from './pages/ProfilePage';
 
 // Precedence when a user has multiple roles: later roles' pages win on a
 // path collision (e.g. both Admin and Trainer have a 'sequences' page).
@@ -137,6 +138,7 @@ function AppRoutes() {
           <Route key={path} path={path} element={element} />
         ))}
         <Route path="notifications" element={<Notifications />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

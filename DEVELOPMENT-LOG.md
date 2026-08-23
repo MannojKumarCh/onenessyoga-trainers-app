@@ -438,6 +438,20 @@ Verified live against `trainers.onenessyoga.in`: correct new bundle serving (che
 
 ---
 
+## 24. My Profile page - view/edit name, Zoom link, email, and password (2026-08-23)
+
+Auditing Phase 1 surfaced a real gap: there was no "My Profile"/"My Account" page anywhere in the app, for any role. `PUT /auth/me` (name/zoom_link) and `PUT /auth/me/password` already existed on the backend, but no frontend page ever called either one outside the forced must-change-password flow (§20) - a trainer or sequence_creator had no way to see or edit their own account at all, and nobody could change their own email under any circumstances.
+
+- New `ProfilePage.jsx`, reachable by every role via a new profile icon in the app header (`AppLayout.jsx`, next to the notification bell and logout button) and routed at `/profile` in `App.jsx` (outside the per-role route tables, since it applies to everyone regardless of role).
+- Three sections: **Profile** (name + Zoom link, `PUT /auth/me`), **Change Email** (`current_password` + `new_email`, new `PUT /auth/me/email`), **Change Password** (`PUT /auth/me/password`, the same endpoint the forced first-login flow uses, now also available voluntarily at any time).
+- Email change requires the current password, same as the password-change endpoint - since email is both the login identifier and the forgot-password recovery target, a merely-authenticated session shouldn't be able to silently redirect account recovery to an attacker's inbox. Reuses the same normalize/409-on-duplicate pattern already used in `POST /users` and admin's `PUT /users/:id`.
+
+**Bug found and fixed while building this**: `PUT /auth/me` computed its zoom_link fallback from `req.user.zoom_link` (the JWT payload) - but the JWT has never carried `zoom_link` at all, so that fallback was always `undefined`, meaning *every* call to this endpoint silently wiped zoom_link to `null` whenever the caller didn't resend it (which nothing ever did, since nothing called this endpoint before now). Fixed by fetching the user's current values from the DB instead of trusting the JWT payload for anything beyond `id`.
+
+Verified locally: updating just the name via `PUT /auth/me` leaves an existing zoom_link untouched (confirmed via `GET /auth/me`); email change 400s on a wrong password, 409s on an email already in use, and 200s + immediately works for login on a fresh unique email (normalized/lowercased) while the old email correctly stops working.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).
