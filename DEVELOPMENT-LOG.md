@@ -406,6 +406,15 @@ Verified locally end-to-end: a freshly admin-created account logs in with `must_
 
 ---
 
+## 21. Header logo now links home; login always lands on the dashboard (2026-08-23)
+
+Two small navigation fixes:
+
+- The top-left logo/app name in `AppLayout.jsx` was static text - clicking it did nothing. Wrapped it in a `Link to="/"`, matching the standard "logo goes home" convention used across virtually every app.
+- A reported regression of the earlier "redirect to home on fresh boot" fix (`df05799`): that fix only handles a genuine fresh page load (new tab, PWA relaunch) via a `sessionStorage` flag that's set once per JS load and never fires again. It does **not** cover logging out and logging back in **within the same tab/session** (no reload) - the browser URL doesn't reset on logout, so if you log out from, say, `/sequences` and log back in, the router just re-renders whatever page matches that still-stale `/sequences` URL, since nothing had ever explicitly navigated to `/` on a successful login. Fixed by calling `navigate('/', { replace: true })` right after a successful `login()` or Google sign-in in `LoginPage.jsx`. This also incidentally fixes the same stale-URL problem for the §20 must-change-password gate (which renders under a wildcard route regardless of path, so once the flag clears the URL is now correctly `/` rather than wherever it happened to be at login time).
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).

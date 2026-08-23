@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import PasswordInput from '../components/PasswordInput';
@@ -7,6 +7,7 @@ import InstallAppButton from '../components/InstallAppButton';
 
 export default function LoginPage() {
   const { login, loginWithGoogle } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -20,6 +21,12 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      // Always land on the home dashboard for a fresh login, never on
+      // whatever page happened to still be in the URL bar from before a
+      // prior logout (the browser URL doesn't reset on logout, and the
+      // fresh-boot redirect in App.jsx only fires once per real page
+      // load - a same-tab logout-then-login never triggers it).
+      navigate('/', { replace: true });
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed. Please check your credentials.');
     } finally {
@@ -35,6 +42,8 @@ export default function LoginPage() {
       setGoogleMessage({ type: 'info', text: result.message });
     } else if (result.error) {
       setGoogleMessage({ type: 'error', text: result.error });
+    } else {
+      navigate('/', { replace: true });
     }
   }
 
