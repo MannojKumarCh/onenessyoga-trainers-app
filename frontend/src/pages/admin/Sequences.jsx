@@ -37,8 +37,8 @@ export default function AdminSequences() {
     return format(startOfWeek(new Date(dateStr), { weekStartsOn: 1 }), 'yyyy-MM-dd');
   }
 
-  const load = useCallback(() => {
-    setLoading(true);
+  const load = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     setLoadError(false);
     const params = new URLSearchParams();
     if (filtersActive) {
@@ -62,7 +62,7 @@ export default function AdminSequences() {
   }, []);
 
   useEffect(() => { if (!filtersActive && !selectedWeek) return; load(); }, [selectedWeek, filtersActive, load]);
-  usePolling(load, 30000);
+  usePolling(() => load(true), 30000);
 
   async function submit(e) {
     e.preventDefault();

@@ -18,15 +18,15 @@ export default function AdminLeaves() {
 
   const { showToast } = useToast();
 
-  const load = useCallback(() => {
-    setLoading(true);
+  const load = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     setError(false);
     const q = filter ? `?status=${filter}` : '';
     client.get(`/leaves${q}`).then(r => setLeaves(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
-  usePolling(load, 30000);
+  usePolling(() => load(true), 30000);
 
   async function review(status) {
     setReviewError('');

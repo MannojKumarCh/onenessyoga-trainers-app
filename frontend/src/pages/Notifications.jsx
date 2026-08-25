@@ -14,14 +14,14 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
-  const load = useCallback(() => {
-    setLoading(true);
+  const load = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     setLoadError(false);
     client.get('/notifications/history').then(r => setNotifications(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
-  usePolling(load, 30000);
+  usePolling(() => load(true), 30000);
 
   async function handleClick(item) {
     if (!item.is_read) {

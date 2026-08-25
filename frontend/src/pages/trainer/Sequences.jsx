@@ -30,9 +30,9 @@ export default function Sequences() {
     }).catch(() => { setError(true); setLoading(false); });
   }, []);
 
-  const load = useCallback(() => {
+  const load = useCallback((silent = false) => {
     if (!filtersActive && !selectedWeek) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     const params = new URLSearchParams();
     if (filtersActive) {
       if (filters.search) params.set('topic', filters.search);
@@ -46,7 +46,7 @@ export default function Sequences() {
   }, [selectedWeek, filters, filtersActive]);
 
   useEffect(() => { load(); }, [load]);
-  usePolling(load, 30000);
+  usePolling(() => load(true), 30000);
 
   return (
     <div className="page">
