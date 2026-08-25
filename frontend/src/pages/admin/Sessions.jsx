@@ -45,8 +45,8 @@ export default function AdminSessions() {
   const { user } = useAuth();
   const isAlsoTrainer = user.roles.includes('trainer');
 
-  const load = useCallback(() => {
-    setLoading(true);
+  const load = useCallback((silent = false) => {
+    if (!silent) setLoading(true);
     setLoadError(false);
     Promise.all([
       client.get(`/sessions?from=${dateFrom}`),
@@ -58,8 +58,8 @@ export default function AdminSessions() {
   }, [dateFrom]);
 
   useEffect(() => { load(); }, [load]);
-  
-  usePolling(load, 30000);
+
+  usePolling(() => load(true), 30000);
 
   async function submit(e) {
     e.preventDefault();
