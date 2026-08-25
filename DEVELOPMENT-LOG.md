@@ -542,6 +542,22 @@ Migrations: `20260825010000_add_assigned_trainer_override`. Not yet deployed any
 
 ---
 
+## 31. Fix "Remove Schedule Slot" dialog not responding to clicks, and background polling resetting scroll to top across the app (2026-08-25)
+
+Two more issues found testing §29/§30 live on `tdev`.
+
+**Bug**: clicking "Remove" (or "Cancel") in the new Weekly Schedule delete confirmation did nothing - the dialog stayed open no matter what was clicked. Root cause: the `ConfirmDialog` was nested *inside* each slot's `.list-item` div, and `.list-item:active { transform: scale(0.99) }` in `index.css` means pressing any button inside it - including the dialog's own Cancel/Remove - makes that ancestor match `:active` too. Per the CSS spec, an ancestor with a `transform` becomes the containing block for any `position: fixed` descendant, so the modal's full-viewport overlay got clipped to the row's box instead of the screen, and where clicks visually landed no longer matched where they actually registered. Fixed by moving the dialog to render as a sibling of the row instead - exactly how every other modal in the app is structured (`WeeklySchedule.jsx`).
+
+**Bug**: scrolling down on the admin Sessions screen for more than ~30 seconds would jump back to the top on its own. Root cause: `usePolling` re-fetches every 30s to keep data fresh, but `admin/Sessions.jsx`'s `load()` called `setLoading(true)` on *every* invocation - including background polls - which swapped the entire session list out for the "Loading…" placeholder and back, remounting the DOM and resetting scroll position each time.
+
+Checked every other page using `usePolling` for the same anti-pattern (`grep` for `setLoading(true)` inside a polled `load`/`refreshCount` function) and found it in 4 more: `admin/Leaves.jsx`, `admin/Sequences.jsx`, `sequence-creator/Sequences.jsx`, `trainer/Sequences.jsx`, and `Notifications.jsx`. Fixed all 5 the same way: `load` now takes a `silent` parameter (`load(silent = false)`), only sets the loading state when not silent, and `usePolling` calls `() => load(true)`. User-triggered loads (initial mount, filter/date changes, post-action refreshes) are untouched and still show the loading state as before.
+
+Verified every other `usePolling` call site in the app (`admin/Trainers.jsx`, `admin/Dashboard.jsx`, `trainer/Dashboard.jsx`, `trainer/CompletedSessions.jsx`, `trainer/SequenceDetail.jsx`, `trainer/SessionDetail.jsx`, `trainer/Leaves.jsx`, `NotificationBell.jsx`, and both `Resources.jsx` pages) does *not* re-arm loading on its polled function, so none of them had this bug - `admin/Resources.jsx` and `trainer/Resources.jsx` already used a separate silent `pollLoad` for exactly this reason, which is where the fix pattern came from. `npm run build` clean after each change; diffs are minimal (6 lines per file) and touch only the polling wiring, nothing else.
+
+No schema/migration changes - pure frontend fix, deployed to `tdev.onenessyoga.in` (rebuild + no backend restart needed for the polling fix; the dialog fix and §30's backend changes were deployed together earlier the same day).
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).
