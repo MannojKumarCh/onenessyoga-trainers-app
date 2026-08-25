@@ -104,14 +104,26 @@ export default function SessionDetail() {
             <span style={{ fontWeight: 600 }}>{session.backup_trainer_name}</span>
           </div>
         )}
-        {session.zoom_link && (
-          <div style={{ padding: '10px 0' }}>
-            <span style={{ color: 'var(--text-secondary)', fontSize: 14, display: 'block', marginBottom: 4 }}>Zoom Link</span>
-            <a href={session.zoom_link} target="_blank" rel="noreferrer" style={{ fontSize: 14, wordBreak: 'break-all', color: 'var(--primary)' }}>
-              {session.zoom_link}
-            </a>
-          </div>
-        )}
+        {(() => {
+          const isBackupViewer = session.backup_trainer_id === user?.id;
+          const fallbackZoomLink = isBackupViewer ? session.backup_trainer_zoom_link : session.trainer_zoom_link;
+          const effectiveZoomLink = session.zoom_link || fallbackZoomLink || null;
+          const isFallback = !session.zoom_link && !!fallbackZoomLink;
+          return (
+            <div style={{ padding: '10px 0' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: 14, display: 'block', marginBottom: 4 }}>
+                Zoom Link{isFallback ? " (Trainer's)" : ''}
+              </span>
+              {effectiveZoomLink ? (
+                <a href={effectiveZoomLink} target="_blank" rel="noreferrer" style={{ fontSize: 14, wordBreak: 'break-all', color: 'var(--primary)' }}>
+                  {effectiveZoomLink}
+                </a>
+              ) : (
+                <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>Zoom link not set</span>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {session.sequence?.instructions && (

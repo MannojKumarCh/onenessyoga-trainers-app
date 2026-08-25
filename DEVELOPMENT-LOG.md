@@ -498,6 +498,26 @@ Verified locally: a session on a date with no sequence returns `sequence: null` 
 
 ---
 
+## 29. Session-level Zoom Link: Weekly Schedule default + per-session override + trainer fallback (2026-08-25)
+
+Sessions already had their own `zoom_link` column, but nothing ever populated it - the admin's "Add Session" form had the field, but there was no way to set it per-slot by default or to edit it after creation, so every real session's Zoom Link stayed empty and Session Detail silently showed nothing. Reported by the user viewing a real session with no link, while their own personal Zoom Link (`User.zoom_link`) *was* set - raising the design question of where the link should actually live.
+
+Resolved as: the session's own `zoom_link` is authoritative; the assigned/backup trainer's personal `zoom_link` is only a fallback for display when a session has none.
+
+- `SessionTemplate.zoom_link` (new column) - the default link for a Weekly Schedule slot (e.g. all future 6:15 AM sessions).
+- `Session.zoom_link_is_override` (new boolean, default `false`) - marks a session whose Zoom Link was set individually rather than inherited from its slot's template.
+- `sessionGenerator.js` now copies the template's `zoom_link` onto every newly-generated session for that slot.
+- `PUT /session-templates/:id`: when the slot's default `zoom_link` changes, every future (`scheduled_date >= today`) session for that slot with `zoom_link_is_override: false` is backfilled to the new value - sessions with an explicit per-session override are always skipped, exactly mirroring the existing dedicated-trainer backfill's "never touch an explicit assignment" rule.
+- New `PATCH /sessions/:id/zoom-link` (super_admin only) - sets one session's Zoom Link and always marks `zoom_link_is_override: true`, so it's immune to future Weekly Schedule changes for that slot.
+- Admin UI: `WeeklySchedule.jsx` gets a Zoom Link input per slot; `admin/Sessions.jsx` gets a new "Zoom" button per session row (mirrors the existing Assign/Backup pattern) opening a small modal to set that one session's link, plus a `· Zoom: Set/Not set` indicator in the list.
+- `SessionDetail.jsx`'s Zoom Link display now falls back: session's own link → the viewer's applicable trainer link (`backup_trainer_zoom_link` if the viewer is the backup, else `trainer_zoom_link`) → "Zoom link not set", labeling the row "Zoom Link (Trainer's)" when showing the fallback.
+
+Verified locally end-to-end: set a slot's default via `PUT /session-templates/:id` and confirmed every future session for that slot updated except a session pre-marked as an override, and past-dated sessions for the same slot were untouched; set one session's link directly via `PATCH /sessions/:id/zoom-link` and confirmed it was marked overridden and survived a subsequent Weekly Schedule default change; ran `generateUpcomingSessions()` and confirmed newly-created sessions inherited the slot's current default; confirmed `GET /sessions/:id` returns `trainer_zoom_link`/`backup_trainer_zoom_link` alongside the session's own `zoom_link`. All test data reverted afterward - dev DB's template defaults, session zoom links/override flags, and session count are unchanged from before this work.
+
+Migration: `20260825000000_add_zoom_link_override`. Not yet deployed to prod - dev only per standing policy.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).

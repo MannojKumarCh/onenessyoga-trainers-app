@@ -92,6 +92,7 @@ model Session {
   backup_trainer_id   Int?
   backup_trainer      User?     @relation("SessionBackupTrainer", fields: [backup_trainer_id], references: [id], onDelete: SetNull)
   zoom_link           String?
+  zoom_link_is_override Boolean @default(false)
   notes               String?
   is_completed        Boolean   @default(false)
   completed_at        DateTime?
@@ -114,6 +115,7 @@ model SessionTemplate {
   session_type         String?  @default("BKP")
   dedicated_trainer_id Int?
   dedicated_trainer    User?    @relation("SessionTemplateTrainer", fields: [dedicated_trainer_id], references: [id], onDelete: SetNull)
+  zoom_link            String?
   title                String   @default("Daily Session")
   is_active            Boolean  @default(true)
   created_at           DateTime @default(now())

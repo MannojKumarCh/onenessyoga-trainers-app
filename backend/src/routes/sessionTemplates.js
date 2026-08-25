@@ -40,7 +40,7 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
   const template = await prisma.sessionTemplate.findUnique({ where: { id } });
   if (!template) return res.status(404).json({ error: 'Not found' });
 
-  const { scheduled_time, session_type, dedicated_trainer_id, title, is_active } = req.body;
+  const { scheduled_time, session_type, dedicated_trainer_id, title, is_active, zoom_link } = req.body;
 
   let trainerId = template.dedicated_trainer_id;
   if (dedicated_trainer_id !== undefined) {
@@ -56,6 +56,8 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
   }
 
   const effectiveTime = scheduled_time ?? template.scheduled_time;
+  const nextZoomLink = zoom_link !== undefined ? (zoom_link || null) : template.zoom_link;
+  const zoomLinkChanged = nextZoomLink !== template.zoom_link;
 
   await prisma.sessionTemplate.update({
     where: { id },
@@ -64,7 +66,8 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
       session_type: session_type ?? template.session_type,
       title: title ?? template.title,
       is_active: is_active !== undefined ? Boolean(is_active) : template.is_active,
-      dedicated_trainer_id: trainerId
+      dedicated_trainer_id: trainerId,
+      zoom_link: nextZoomLink
     }
   });
 
@@ -89,6 +92,25 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
         body: `You're now the default trainer for ${matchIds.length} upcoming "${template.label}" session(s)`,
         url: '/sessions'
       }).catch(() => {});
+    }
+  }
+
+  // Backfill: a changed default Zoom Link repropagates to every future
+  // session for this slot that hasn't had its Zoom Link explicitly
+  // overridden for that one session (zoom_link_is_override). A session an
+  // admin has manually set a link for is never touched here.
+  if (zoomLinkChanged) {
+    const todayIst = new Date(Date.now() + IST_OFFSET_MS).toISOString().split('T')[0];
+    const candidates = await prisma.session.findMany({
+      where: { scheduled_time: effectiveTime, zoom_link_is_override: false, scheduled_date: { gte: todayIst } },
+      select: { id: true, scheduled_date: true }
+    });
+    const zoomMatchIds = candidates
+      .filter(s => template.weekdays.includes(new Date(`${s.scheduled_date}T00:00:00Z`).getUTCDay()))
+      .map(s => s.id);
+
+    if (zoomMatchIds.length > 0) {
+      await prisma.session.updateMany({ where: { id: { in: zoomMatchIds } }, data: { zoom_link: nextZoomLink } });
     }
   }
 

@@ -186,6 +186,7 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
       session_type: session_type || 'BKP',
       assigned_trainer_id: trainerId,
       zoom_link: zoom_link || null,
+      zoom_link_is_override: !!zoom_link,
       created_by: req.user.id
     }
   });
@@ -329,6 +330,21 @@ router.patch('/:id/backup', authenticate, requireRole('super_admin'), async (req
         .catch(err => console.error('Failed to send backup-assignment email to assigned trainer:', err));
     }
   }
+
+  res.json({ success: true });
+});
+
+// Admin: set or clear this one session's Zoom Link. Always marks it as an
+// explicit override, so a later Weekly Schedule default-link change never
+// clobbers it - the only way back to the slot's default is another Weekly
+// Schedule edit's backfill, which skips overridden sessions on purpose.
+router.patch('/:id/zoom-link', authenticate, requireRole('super_admin'), async (req, res) => {
+  const id = parseInt(req.params.id);
+  const session = await prisma.session.findUnique({ where: { id } });
+  if (!session) return res.status(404).json({ error: 'Not found' });
+
+  const zoomLink = req.body.zoom_link || null;
+  await prisma.session.update({ where: { id }, data: { zoom_link: zoomLink, zoom_link_is_override: true } });
 
   res.json({ success: true });
 });

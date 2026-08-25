@@ -9,7 +9,8 @@ function TemplateRow({ template, trainers, onSaved }) {
     scheduled_time: template.scheduled_time,
     session_type: template.session_type || '',
     dedicated_trainer_id: template.dedicated_trainer_id || '',
-    is_active: template.is_active
+    is_active: template.is_active,
+    zoom_link: template.zoom_link || ''
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -18,7 +19,8 @@ function TemplateRow({ template, trainers, onSaved }) {
   const dirty = form.scheduled_time !== template.scheduled_time
     || form.session_type !== (template.session_type || '')
     || String(form.dedicated_trainer_id || '') !== String(template.dedicated_trainer_id || '')
-    || form.is_active !== template.is_active;
+    || form.is_active !== template.is_active
+    || form.zoom_link !== (template.zoom_link || '');
 
   async function save() {
     const nextTrainerId = form.dedicated_trainer_id ? Number(form.dedicated_trainer_id) : null;
@@ -36,7 +38,8 @@ function TemplateRow({ template, trainers, onSaved }) {
         scheduled_time: form.scheduled_time,
         session_type: form.session_type,
         dedicated_trainer_id: form.dedicated_trainer_id ? Number(form.dedicated_trainer_id) : null,
-        is_active: form.is_active
+        is_active: form.is_active,
+        zoom_link: form.zoom_link || null
       });
       showToast('Schedule Slot Updated');
       onSaved();
@@ -81,6 +84,16 @@ function TemplateRow({ template, trainers, onSaved }) {
             <option value="">Unassigned</option>
             {trainers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            type="url"
+            className="input"
+            style={{ minWidth: 240, flex: 1 }}
+            placeholder="Default Zoom Link for this slot — https://…"
+            value={form.zoom_link}
+            onChange={e => setForm(f => ({ ...f, zoom_link: e.target.value }))}
+          />
           <button
             className="btn btn-primary"
             style={{ padding: '8px 16px', fontSize: 13 }}
@@ -116,7 +129,7 @@ export default function WeeklySchedule({ trainers }) {
   return (
     <div>
       <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16 }}>
-        These slots repeat automatically every week — the app keeps the next 14 days of sessions filled in from them. Changing a slot here only affects sessions generated from now on, not ones already scheduled.
+        These slots repeat automatically every week — the app keeps the next 14 days of sessions filled in from them. Changing a slot's Zoom Link here updates every upcoming session for that slot, except any session where the link was set individually on the Sessions tab.
       </p>
 
       <p className="section-title">Monday – Friday</p>

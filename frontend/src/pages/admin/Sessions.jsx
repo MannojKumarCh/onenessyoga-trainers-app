@@ -36,6 +36,10 @@ export default function AdminSessions() {
   const [assignTrainerId, setAssignTrainerId] = useState('');
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [assignError, setAssignError] = useState('');
+  const [zoomFor, setZoomFor] = useState(null);
+  const [zoomLinkValue, setZoomLinkValue] = useState('');
+  const [zoomSubmitting, setZoomSubmitting] = useState(false);
+  const [zoomError, setZoomError] = useState('');
 
   const { showToast } = useToast();
   const { user } = useAuth();
@@ -131,6 +135,28 @@ export default function AdminSessions() {
     }
   }
 
+  function openZoom(session) {
+    setZoomFor(session);
+    setZoomLinkValue(session.zoom_link || '');
+    setZoomError('');
+  }
+
+  async function submitZoom(e) {
+    e.preventDefault();
+    setZoomError('');
+    setZoomSubmitting(true);
+    try {
+      await client.patch(`/sessions/${zoomFor.id}/zoom-link`, { zoom_link: zoomLinkValue || null });
+      setZoomFor(null);
+      showToast('Zoom Link Updated');
+      load();
+    } catch (err) {
+      setZoomError(getApiErrorMessage(err, 'Failed to update zoom link'));
+    } finally {
+      setZoomSubmitting(false);
+    }
+  }
+
   async function deleteSession(id) {
     setDeleteId(null);
     setError('');
@@ -210,11 +236,13 @@ export default function AdminSessions() {
                 <div className="list-item-sub">
                   {s.scheduled_time} · {s.trainer_name || 'Unassigned'}
                   {s.backup_trainer_name && ` · Backup: ${s.backup_trainer_name}`}
+                  {` · Zoom: ${s.zoom_link ? 'Set' : 'Not set'}`}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 4 }}>
                 <button onClick={() => openAssign(s)} style={{ color: 'var(--primary)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Assign</button>
                 <button onClick={() => openBackup(s)} style={{ color: 'var(--primary)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Backup</button>
+                <button onClick={() => openZoom(s)} style={{ color: 'var(--primary)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Zoom</button>
                 <button onClick={() => setDeleteId(s.id)} style={{ color: 'var(--danger)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
               </div>
             </div>
@@ -325,6 +353,29 @@ export default function AdminSessions() {
               <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setBackupFor(null)}>Cancel</button>
               <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={backupSubmitting}>
                 {backupSubmitting ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {zoomFor && (
+        <Modal title="Session Zoom Link" onClose={() => setZoomFor(null)}>
+          <form onSubmit={submitZoom}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 8 }}>
+              {zoomFor.title} · {zoomFor.scheduled_date} at {zoomFor.scheduled_time}
+            </p>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 16 }}>
+              This only changes the Zoom Link for this one session. To change the default for every future {zoomFor.scheduled_time} session, use the Weekly Schedule tab.
+            </p>
+            <div className="form-group">
+              <label className="label" htmlFor="zoom-link">Zoom Link</label>
+              <input id="zoom-link" className="input" type="url" value={zoomLinkValue} onChange={e => setZoomLinkValue(e.target.value)} placeholder="https://…" />
+            </div>
+            {zoomError && <p className="error-text" style={{ marginBottom: 12 }}>{zoomError}</p>}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setZoomFor(null)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={zoomSubmitting}>
+                {zoomSubmitting ? 'Saving…' : 'Save'}
               </button>
             </div>
           </form>

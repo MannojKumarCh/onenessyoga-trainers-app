@@ -43,7 +43,8 @@ async function generateUpcomingSessions(now = new Date()) {
         scheduled_date: date,
         scheduled_time: t.scheduled_time,
         session_type: t.session_type || 'BKP',
-        assigned_trainer_id: t.dedicated_trainer_id
+        assigned_trainer_id: t.dedicated_trainer_id,
+        zoom_link: t.zoom_link || null
       });
       existingKeys.add(key);
     }
