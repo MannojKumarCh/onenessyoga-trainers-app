@@ -99,6 +99,7 @@ function TemplateRow({ template, trainers, onSaved }) {
   }
 
   return (
+    <>
     <div className="list-item" style={{ flexWrap: 'wrap', opacity: form.is_active ? 1 : 0.55 }}>
       <div className="list-item-left" style={{ flex: '1 1 100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -161,18 +162,19 @@ function TemplateRow({ template, trainers, onSaved }) {
         </div>
         {error && <p className="error-text" style={{ margin: 0 }}>{error}</p>}
       </div>
-
-      {confirmDelete && (
-        <ConfirmDialog
-          title="Remove Schedule Slot"
-          message={`Remove "${template.label}"? No more sessions will be auto-generated for it going forward. Sessions already created from it (past or future) will stay as they are — delete those individually from the Sessions tab if needed.`}
-          confirmLabel={deleting ? 'Removing…' : 'Remove'}
-          danger
-          onCancel={() => setConfirmDelete(false)}
-          onConfirm={remove}
-        />
-      )}
     </div>
+
+    {confirmDelete && (
+      <ConfirmDialog
+        title="Remove Schedule Slot"
+        message={`Remove "${template.label}"? No more sessions will be auto-generated for it going forward. Sessions already created from it (past or future) will stay as they are — delete those individually from the Sessions tab if needed.`}
+        confirmLabel={deleting ? 'Removing…' : 'Remove'}
+        danger
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={remove}
+      />
+    )}
+    </>
   );
 }
 
