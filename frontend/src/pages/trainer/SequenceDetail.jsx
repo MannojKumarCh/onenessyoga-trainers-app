@@ -16,6 +16,10 @@ function isLikelyUrl(value) {
   return /^https?:\/\//i.test(value.trim());
 }
 
+function truncateUrl(value, max = 40) {
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
 const sheetHeaderCell = {
   padding: '8px', fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)',
   background: 'var(--bg)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border)'
@@ -207,9 +211,10 @@ export default function SequenceDetail() {
                     href={item.reference_url}
                     target="_blank"
                     rel="noreferrer"
+                    title={item.reference_url}
                     style={{ fontSize: 12, wordBreak: 'break-all', display: 'inline-block', marginTop: 2 }}
                   >
-                    Reference
+                    {truncateUrl(item.reference_url)}
                   </a>
                 ) : (
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)', wordBreak: 'break-word', marginTop: 2 }}>

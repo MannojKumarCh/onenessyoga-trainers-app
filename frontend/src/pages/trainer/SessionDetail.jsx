@@ -14,6 +14,10 @@ function isLikelyUrl(value) {
   return /^https?:\/\//i.test(value.trim());
 }
 
+function truncateUrl(value, max = 40) {
+  return value.length > max ? `${value.slice(0, max)}…` : value;
+}
+
 export default function SessionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -154,9 +158,10 @@ export default function SessionDetail() {
                     href={item.reference_url}
                     target="_blank"
                     rel="noreferrer"
+                    title={item.reference_url}
                     style={{ fontSize: 12, wordBreak: 'break-all', display: 'inline-block', marginTop: 2 }}
                   >
-                    Reference
+                    {truncateUrl(item.reference_url)}
                   </a>
                 ) : (
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)', wordBreak: 'break-word', marginTop: 2 }}>
