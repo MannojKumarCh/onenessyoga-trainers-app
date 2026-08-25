@@ -89,6 +89,7 @@ model Session {
   session_type        String?   @default("BKP")
   assigned_trainer_id Int?
   assigned_trainer    User?     @relation("SessionTrainer", fields: [assigned_trainer_id], references: [id], onDelete: SetNull)
+  assigned_trainer_is_override Boolean @default(false)
   backup_trainer_id   Int?
   backup_trainer      User?     @relation("SessionBackupTrainer", fields: [backup_trainer_id], references: [id], onDelete: SetNull)
   zoom_link           String?

@@ -514,7 +514,31 @@ Resolved as: the session's own `zoom_link` is authoritative; the assigned/backup
 
 Verified locally end-to-end: set a slot's default via `PUT /session-templates/:id` and confirmed every future session for that slot updated except a session pre-marked as an override, and past-dated sessions for the same slot were untouched; set one session's link directly via `PATCH /sessions/:id/zoom-link` and confirmed it was marked overridden and survived a subsequent Weekly Schedule default change; ran `generateUpcomingSessions()` and confirmed newly-created sessions inherited the slot's current default; confirmed `GET /sessions/:id` returns `trainer_zoom_link`/`backup_trainer_zoom_link` alongside the session's own `zoom_link`. All test data reverted afterward - dev DB's template defaults, session zoom links/override flags, and session count are unchanged from before this work.
 
-Migration: `20260825000000_add_zoom_link_override`. Not yet deployed to prod - dev only per standing policy.
+Migration: `20260825000000_add_zoom_link_override`. Deployed to the dev VM (`tdev.onenessyoga.in`) the same day - dev DB backed up first (`oneness_trainers_dev_pre_zoom_link_migration_20260825031555.sql`). Not yet on prod.
+
+---
+
+## 30. Weekly Schedule: Add/Delete slots, and fix the default-trainer backfill only hitting Unassigned sessions (2026-08-25)
+
+Two issues found testing §29 live on `tdev`:
+
+**Bug**: assigning a trainer to a slot in Weekly Schedule was only reflecting on sessions that had *never* had a trainer (`assigned_trainer_id: null`). In practice almost every already-generated session already has *some* trainer on it (inherited from whatever the template's default was at generation time), so the backfill silently did nothing for the common case - exactly the same class of bug §29 had already fixed for Zoom Link, just not yet applied to the trainer field. Root cause: there was no way to tell "this session's trainer just came from the template default" apart from "an admin explicitly assigned this session's trainer" - both looked like a non-null `assigned_trainer_id`.
+
+Fixed with the same override-flag pattern as Zoom Link:
+- `Session.assigned_trainer_is_override` (new boolean, default `false`).
+- Set to `true` whenever a trainer is assigned via `POST /sessions` (ad-hoc creation with a trainer) or `PUT /sessions/:id` (the Sessions tab's "Assign" action) - both are explicit per-session actions.
+- Left `false` when `sessionGenerator.js` fills it in from the template's `dedicated_trainer_id`.
+- `PUT /session-templates/:id`'s backfill now matches on `assigned_trainer_is_override: false` (today-or-later sessions for that slot) instead of `assigned_trainer_id: null`, so it updates every session still on its inherited default - not just ones that were never assigned at all. Also now fires even when the new default is being cleared to Unassigned (previously only fired when setting a *non-null* trainer).
+
+**Feature**: Weekly Schedule only supported editing the 8 originally-seeded slots (time, type, trainer, zoom link, active) - no way to add a new slot, remove one, or change which weekdays it runs on. Added:
+- `weekdays` is now editable per slot (a Sun-Sat toggle-button picker), previously hard-coded as fixed at seed time.
+- `POST /session-templates` - creates a new slot; label is auto-generated from time + weekdays (e.g. "6:15 AM" for a Mon-Fri slot, "Sun 7:00 AM" for a single day, "Mon/Wed/Fri 6:00 AM" for a custom combination).
+- `DELETE /session-templates/:id` - removes a slot outright. Only stops *future* generation; sessions already created from it (past or future) are left alone, same as toggling a slot inactive - matches the existing "don't retroactively touch generated sessions" philosophy everywhere else in this feature.
+- `WeeklySchedule.jsx`: replaced the old fixed "Monday-Friday / Saturday" two-bucket layout (which assumed only those two patterns exist) with a single list plus a collapsible "+ Add Slot" form and a per-row Delete button (with a confirmation dialog explaining what does and doesn't get cleaned up).
+
+Verified locally: reproduced the exact bug (sessions pre-seeded with a trainer inherited from an old default, one manually marked overridden) then confirmed a template trainer change updated every non-overridden today-or-future session while leaving the overridden one and all past-dated sessions untouched; created a new Sunday 7:00 AM slot via `POST` and confirmed its auto-generated label and weekday; deleted it via `DELETE` and confirmed it disappeared from the list. All test data reverted afterward.
+
+Migrations: `20260825010000_add_assigned_trainer_override`. Not yet deployed anywhere - built and tested locally only; the dev VM still has the pre-fix version live at time of writing.
 
 ---
 

@@ -185,6 +185,7 @@ router.post('/', authenticate, requireRole('super_admin'), async (req, res) => {
       scheduled_time,
       session_type: session_type || 'BKP',
       assigned_trainer_id: trainerId,
+      assigned_trainer_is_override: !!trainerId,
       zoom_link: zoom_link || null,
       zoom_link_is_override: !!zoom_link,
       created_by: req.user.id
@@ -219,6 +220,7 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
       scheduled_time: scheduled_time ?? session.scheduled_time,
       session_type: session_type ?? session.session_type,
       assigned_trainer_id: nextTrainerId ?? session.assigned_trainer_id,
+      assigned_trainer_is_override: assigned_trainer_id !== undefined ? true : session.assigned_trainer_is_override,
       zoom_link: zoom_link ?? session.zoom_link
     }
   });
