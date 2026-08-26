@@ -96,9 +96,22 @@ export default function AdminResources() {
         <div key={item.id} className="list-item" style={{ cursor: item.type === 'folder' ? 'pointer' : 'default' }}
           onClick={() => item.type === 'folder' && setFolderId(item.id)}>
           <span style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }}>{item.type === 'folder' ? <FolderIcon style={{ width: 24, height: 24 }} /> : <LinkIcon style={{ width: 24, height: 24 }} />}</span>
-          <div className="list-item-left">
+          <div className="list-item-left" style={{ minWidth: 0 }}>
             <div className="list-item-title">{item.name}</div>
-            <div className="list-item-sub">{item.type === 'folder' ? 'Folder' : item.url}</div>
+            {item.type === 'folder' ? (
+              <div className="list-item-sub">Folder</div>
+            ) : (
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                onClick={e => e.stopPropagation()}
+                className="list-item-sub"
+                style={{ display: 'block', wordBreak: 'break-all', color: 'var(--primary)' }}
+              >
+                {item.url}
+              </a>
+            )}
           </div>
           <button onClick={(e) => { e.stopPropagation(); setDeleteId(item.id); }} style={{ color: 'var(--danger)', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
         </div>
