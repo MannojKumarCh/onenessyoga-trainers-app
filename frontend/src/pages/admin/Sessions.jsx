@@ -43,7 +43,7 @@ export default function AdminSessions() {
 
   const { showToast } = useToast();
   const { user } = useAuth();
-  const isAlsoTrainer = user.roles.includes('trainer');
+  const isAlsoTrainer = user.roles.includes('trainer') || user.roles.includes('kids_yoga_trainer');
 
   const load = useCallback((silent = false) => {
     if (!silent) setLoading(true);

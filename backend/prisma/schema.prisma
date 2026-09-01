@@ -10,6 +10,7 @@ enum Role {
   super_admin
   sequence_creator
   trainer
+  kids_yoga_trainer
 }
 
 enum LeaveStatus {

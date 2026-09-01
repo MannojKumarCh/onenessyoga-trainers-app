@@ -13,7 +13,7 @@ const validateIdParam = require('../middleware/validateIdParam');
 router.param('id', validateIdParam);
 
 // Trainer: my leaves
-router.get('/my', authenticate, requireRole('trainer'), async (req, res) => {
+router.get('/my', authenticate, requireRole('trainer', 'kids_yoga_trainer'), async (req, res) => {
   const leaves = await prisma.leave.findMany({
     where: { trainer_id: req.user.id },
     include: { reviewer: { select: { name: true } } },
@@ -38,7 +38,7 @@ router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
 });
 
 // Trainer: apply for leave
-router.post('/', authenticate, requireRole('trainer'), async (req, res) => {
+router.post('/', authenticate, requireRole('trainer', 'kids_yoga_trainer'), async (req, res) => {
   const { from_date, to_date, reason } = req.body;
   if (!from_date || !to_date || !reason) return res.status(400).json({ error: 'from_date, to_date, reason required' });
   if (from_date > to_date) return res.status(400).json({ error: 'from_date must be before to_date' });
@@ -83,7 +83,7 @@ router.patch('/:id/review', authenticate, requireRole('super_admin'), async (req
 });
 
 // Trainer: cancel pending leave
-router.delete('/:id', authenticate, requireRole('trainer'), async (req, res) => {
+router.delete('/:id', authenticate, requireRole('trainer', 'kids_yoga_trainer'), async (req, res) => {
   const id = parseInt(req.params.id);
   const leave = await prisma.leave.findUnique({ where: { id } });
   if (!leave) return res.status(404).json({ error: 'Not found' });

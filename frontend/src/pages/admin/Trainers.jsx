@@ -10,7 +10,7 @@ import { ExclamationTriangleIcon, PlusIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 
-const ROLE_OPTIONS = ['trainer', 'sequence_creator', 'super_admin'];
+const ROLE_OPTIONS = ['trainer', 'kids_yoga_trainer', 'sequence_creator', 'super_admin'];
 const EMPTY = { name: '', email: '', password: '', roles: ['trainer'], zoom_link: '', whatsapp_number: '' };
 
 export default function AdminTrainers() {
@@ -75,7 +75,7 @@ export default function AdminTrainers() {
         await applyDefaultSlots(editing.id, previousIds);
       } else {
         const { data } = await client.post('/users', form);
-        if (form.roles.includes('trainer') && defaultSlotIds.length > 0) {
+        if ((form.roles.includes('trainer') || form.roles.includes('kids_yoga_trainer')) && defaultSlotIds.length > 0) {
           await applyDefaultSlots(data.id, []);
         }
       }
@@ -234,7 +234,7 @@ export default function AdminTrainers() {
                   ))}
                 </div>
               </div>
-              {form.roles.includes('trainer') && (
+              {(form.roles.includes('trainer') || form.roles.includes('kids_yoga_trainer')) && (
                 <div className="form-group">
                   <label className="label">Default Sessions</label>
                   <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px' }}>

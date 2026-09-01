@@ -27,19 +27,24 @@ import ProfilePage from './pages/ProfilePage';
 
 // Precedence when a user has multiple roles: later roles' pages win on a
 // path collision (e.g. both Admin and Trainer have a 'sequences' page).
-const ROLE_PRECEDENCE = ['trainer', 'sequence_creator', 'super_admin'];
+const ROLE_PRECEDENCE = ['trainer', 'kids_yoga_trainer', 'sequence_creator', 'super_admin'];
+
+const TRAINER_ROUTES = [
+  { path: '', element: <Dashboard /> },
+  { path: 'sessions', element: <MySessions /> },
+  { path: 'sessions/:id', element: <SessionDetail /> },
+  { path: 'completed', element: <CompletedSessions /> },
+  { path: 'leaves', element: <Leaves /> },
+  { path: 'sequences', element: <Sequences /> },
+  { path: 'sequences/:id', element: <SequenceDetail /> },
+  { path: 'resources', element: <Resources /> }
+];
 
 const ROUTES_BY_ROLE = {
-  trainer: [
-    { path: '', element: <Dashboard /> },
-    { path: 'sessions', element: <MySessions /> },
-    { path: 'sessions/:id', element: <SessionDetail /> },
-    { path: 'completed', element: <CompletedSessions /> },
-    { path: 'leaves', element: <Leaves /> },
-    { path: 'sequences', element: <Sequences /> },
-    { path: 'sequences/:id', element: <SequenceDetail /> },
-    { path: 'resources', element: <Resources /> }
-  ],
+  trainer: TRAINER_ROUTES,
+  // Kids Yoga Trainer is its own role, but behaves identically to a regular
+  // trainer for now - its distinct features are still to be designed.
+  kids_yoga_trainer: TRAINER_ROUTES,
   // No '' entry: a pure Sequence Creator's home falls back to their
   // 'sequences' page (see buildRoutes below), matching the prior behavior
   // where CreatorSequences was both the index and the /sequences page.

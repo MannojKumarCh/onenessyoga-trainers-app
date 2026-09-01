@@ -11,17 +11,22 @@ import {
 
 // Precedence when a user has multiple roles: later roles win on a path
 // collision (e.g. both Admin and Trainer have a '/sequences' entry).
-export const ROLE_PRECEDENCE = ['trainer', 'sequence_creator', 'super_admin'];
+export const ROLE_PRECEDENCE = ['trainer', 'kids_yoga_trainer', 'sequence_creator', 'super_admin'];
+
+const TRAINER_NAV = [
+  { to: '/', label: 'Home', Icon: HomeIcon, exact: true },
+  { to: '/sessions', label: 'Sessions', Icon: CalendarDaysIcon },
+  { to: '/completed', label: 'Completed', Icon: CheckBadgeIcon },
+  { to: '/leaves', label: 'Leaves', Icon: DocumentTextIcon },
+  { to: '/sequences', label: 'Sequences', Icon: QueueListIcon },
+  { to: '/resources', label: 'Resources', Icon: BookOpenIcon }
+];
 
 export const NAV_BY_ROLE = {
-  trainer: [
-    { to: '/', label: 'Home', Icon: HomeIcon, exact: true },
-    { to: '/sessions', label: 'Sessions', Icon: CalendarDaysIcon },
-    { to: '/completed', label: 'Completed', Icon: CheckBadgeIcon },
-    { to: '/leaves', label: 'Leaves', Icon: DocumentTextIcon },
-    { to: '/sequences', label: 'Sequences', Icon: QueueListIcon },
-    { to: '/resources', label: 'Resources', Icon: BookOpenIcon }
-  ],
+  trainer: TRAINER_NAV,
+  // Kids Yoga Trainer is its own role, but behaves identically to a regular
+  // trainer for now - its distinct features are still to be designed.
+  kids_yoga_trainer: TRAINER_NAV,
   sequence_creator: [
     { to: '/sequences', label: 'Sequences', Icon: QueueListIcon, exact: true }
   ],

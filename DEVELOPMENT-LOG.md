@@ -582,6 +582,23 @@ Verified both directly against the live dev API: created a sequence for a day in
 
 ---
 
+## 34. New role: Kids Yoga Trainer (2026-09-01)
+
+Added `kids_yoga_trainer` as a fourth distinct role (alongside `super_admin`, `sequence_creator`, `trainer`), per explicit decision: a real role in the `Role` enum (not a flag/tag on `trainer`), and - until its own distinct features are designed in a follow-up - it behaves exactly like a regular trainer everywhere in the app, standalone (not required to also hold `trainer`).
+
+- `Role` enum: added `kids_yoga_trainer` (migration `20260901000000_add_kids_yoga_trainer_role`, `ALTER TYPE "Role" ADD VALUE`).
+- Every backend site that gates or filters on the `trainer` role was extended to also accept `kids_yoga_trainer`, so it's a full peer for now rather than a role that does nothing on its own:
+  - `requireRole('trainer')` → `requireRole('trainer', 'kids_yoga_trainer')` on all 9 call sites (`sessions.js`: `GET /my`, `PATCH /:id/complete`, `PATCH /:id/notes`; `leaves.js`: `GET /my`, `POST /`, `DELETE /:id`; `sequences.js`: `PATCH /:id/upload`, `POST /:id/build`, `POST /:id/notify-team`).
+  - `sessions.js`'s `GET /:id` ownership check (`isTrainerOnly`) - previously only recognized bare `trainer`, meaning a `kids_yoga_trainer`-only account would have hit no restriction at all and could view *any* session by id. Found and fixed as part of this work, verified directly (403 on an unrelated session, 200 on their own).
+  - `utils/trainers.js`'s `ensureTrainerExists`/`ensureTrainersExist` (assignability validation), `users.js`'s `GET /trainers` (every trainer-picker dropdown in the app) and `VALID_ROLES`, `utils/sheets.js`'s approved-trainer query (monthly sheet auto-share), and `db/seed.js`'s `VALID_ROLES` (so `npm run seed` accepts the new role).
+- Frontend: `App.jsx`'s `ROUTES_BY_ROLE`/`ROLE_PRECEDENCE` and `config/nav.js`'s `NAV_BY_ROLE`/`ROLE_PRECEDENCE` (the actual bottom-nav) both give `kids_yoga_trainer` the identical route/nav set as `trainer` (`TRAINER_ROUTES`/`TRAINER_NAV` constants, shared rather than duplicated, so future divergence is a one-place change per side). `admin/Trainers.jsx` adds it as a fourth role checkbox (label auto-formats via the existing generic `formatRole` - no new copy needed) and includes it wherever `trainer` gated the "Default Sessions" (Weekly Schedule slot) section. `admin/Dashboard.jsx`'s trainer-count stat and `admin/Sessions.jsx`'s "My Sessions" tab condition also now recognize it.
+
+Verified end-to-end against a local server: created a `kids_yoga_trainer`-only user via `POST /users`, confirmed they appear in `GET /users/trainers`; assigned them as a session's trainer via `POST /sessions` (proves `ensureTrainerExists` accepts the role); as that user, confirmed `GET /sessions/my` and `GET /leaves/my` return 200 (role-gated routes open), `GET /sessions/:id` on their own session returns 200, and on an unrelated session returns 403 (the `isTrainerOnly` fix holds). All test data deleted afterward. `npm run build` clean.
+
+Not yet deployed to prod - dev only per standing policy, pending user testing.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).

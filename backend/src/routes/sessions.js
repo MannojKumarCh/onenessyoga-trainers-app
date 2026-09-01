@@ -94,7 +94,7 @@ function serializeWithZoom(session, topicByDate = new Map()) {
 }
 
 // Trainer: my upcoming sessions (as dedicated trainer or as backup)
-router.get('/my', authenticate, requireRole('trainer'), async (req, res) => {
+router.get('/my', authenticate, requireRole('trainer', 'kids_yoga_trainer'), async (req, res) => {
   const today = new Date().toISOString().split('T')[0];
   const sessions = await prisma.session.findMany({
     where: {
@@ -159,7 +159,7 @@ router.get('/:id', authenticate, async (req, res) => {
   // already see every session, so the restriction only applies when trainer is
   // their sole relevant role.
   const roles = getUserRoles(req.user);
-  const isTrainerOnly = roles.includes('trainer') && !roles.includes('super_admin') && !roles.includes('sequence_creator');
+  const isTrainerOnly = (roles.includes('trainer') || roles.includes('kids_yoga_trainer')) && !roles.includes('super_admin') && !roles.includes('sequence_creator');
   const isParty = session.assigned_trainer_id === req.user.id || session.backup_trainer_id === req.user.id;
   if (isTrainerOnly && !isParty) {
     return res.status(403).json({ error: 'Forbidden' });
@@ -238,7 +238,7 @@ router.put('/:id', authenticate, requireRole('super_admin'), async (req, res) =>
 });
 
 // Trainer: mark session complete / add notes
-router.patch('/:id/complete', authenticate, requireRole('trainer'), async (req, res) => {
+router.patch('/:id/complete', authenticate, requireRole('trainer', 'kids_yoga_trainer'), async (req, res) => {
   const { notes } = req.body;
   const id = parseInt(req.params.id);
   const session = await prisma.session.findUnique({ where: { id } });
@@ -265,7 +265,7 @@ router.patch('/:id/complete', authenticate, requireRole('trainer'), async (req, 
 });
 
 // Trainer: save notes without completing
-router.patch('/:id/notes', authenticate, requireRole('trainer'), async (req, res) => {
+router.patch('/:id/notes', authenticate, requireRole('trainer', 'kids_yoga_trainer'), async (req, res) => {
   const { notes } = req.body;
   const id = parseInt(req.params.id);
   const session = await prisma.session.findUnique({ where: { id } });

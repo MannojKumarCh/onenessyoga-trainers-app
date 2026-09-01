@@ -262,7 +262,7 @@ async function markUploaded(id, link) {
 }
 
 // Assigned trainer: upload Google Sheet link
-router.patch('/:id/upload', authenticate, requireRole('trainer'), async (req, res) => {
+router.patch('/:id/upload', authenticate, requireRole('trainer', 'kids_yoga_trainer'), async (req, res) => {
   const { google_sheet_link } = req.body;
   if (!google_sheet_link) return res.status(400).json({ error: 'google_sheet_link required' });
 
@@ -277,7 +277,7 @@ router.patch('/:id/upload', authenticate, requireRole('trainer'), async (req, re
 });
 
 // Assigned trainer: build sequence content in-app and auto-generate/update the Google Sheet
-router.post('/:id/build', authenticate, requireRole('trainer'), async (req, res) => {
+router.post('/:id/build', authenticate, requireRole('trainer', 'kids_yoga_trainer'), async (req, res) => {
   const { items } = req.body;
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'items must be a non-empty array' });
@@ -320,7 +320,7 @@ router.post('/:id/build', authenticate, requireRole('trainer'), async (req, res)
 });
 
 // Assigned trainer: notify entire team about their uploaded sequence
-router.post('/:id/notify-team', authenticate, requireRole('trainer'), async (req, res) => {
+router.post('/:id/notify-team', authenticate, requireRole('trainer', 'kids_yoga_trainer'), async (req, res) => {
   const id = parseInt(req.params.id);
   const seq = await prisma.sequence.findUnique({
     where: { id },

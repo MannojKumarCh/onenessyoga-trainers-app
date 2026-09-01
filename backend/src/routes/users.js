@@ -16,7 +16,7 @@ const validateIdParam = require('../middleware/validateIdParam');
 
 router.param('id', validateIdParam);
 
-const VALID_ROLES = ['super_admin', 'sequence_creator', 'trainer'];
+const VALID_ROLES = ['super_admin', 'sequence_creator', 'trainer', 'kids_yoga_trainer'];
 
 function validateRoles(roles) {
   if (!Array.isArray(roles) || roles.length === 0) return 'roles must be a non-empty array';
@@ -163,10 +163,12 @@ router.delete('/:id', authenticate, requireRole('super_admin'), async (req, res)
   res.json({ success: true });
 });
 
-// All roles: list trainers only (for dropdowns)
+// All roles: list trainers only (for dropdowns). Kids Yoga Trainers count as
+// trainers here too - until their own distinct features are built, they're
+// assignable to sessions/sequences exactly like any other trainer.
 router.get('/trainers', authenticate, async (req, res) => {
   const trainers = await prisma.user.findMany({
-    where: { roles: { has: 'trainer' }, is_active: true },
+    where: { roles: { hasSome: ['trainer', 'kids_yoga_trainer'] }, is_active: true },
     select: { id: true, name: true, email: true, zoom_link: true },
     orderBy: { name: 'asc' }
   });

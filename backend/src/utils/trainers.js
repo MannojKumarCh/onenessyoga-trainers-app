@@ -17,7 +17,7 @@ async function ensureTrainerExists(trainerId, fieldName = 'assigned_trainer_id')
     select: { id: true, roles: true }
   });
 
-  if (!trainer || !trainer.roles.includes('trainer')) {
+  if (!trainer || !(trainer.roles.includes('trainer') || trainer.roles.includes('kids_yoga_trainer'))) {
     throw httpError(400, `${fieldName} must reference an existing trainer`);
   }
 
@@ -29,7 +29,7 @@ async function ensureTrainerExists(trainerId, fieldName = 'assigned_trainer_id')
 async function ensureTrainersExist(trainerIds, fieldName = 'assigned_trainer_id') {
   const uniqueIds = [...new Set(trainerIds)];
   const trainers = await prisma.user.findMany({
-    where: { id: { in: uniqueIds }, roles: { has: 'trainer' } },
+    where: { id: { in: uniqueIds }, roles: { hasSome: ['trainer', 'kids_yoga_trainer'] } },
     select: { id: true }
   });
   if (trainers.length !== uniqueIds.length) {

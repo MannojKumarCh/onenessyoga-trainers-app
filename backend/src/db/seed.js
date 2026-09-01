@@ -2,7 +2,7 @@ require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const prisma = require('./db');
 
-const VALID_ROLES = ['super_admin', 'sequence_creator', 'trainer'];
+const VALID_ROLES = ['super_admin', 'sequence_creator', 'trainer', 'kids_yoga_trainer'];
 
 const email = process.argv[2] || 'admin@oneness.yoga';
 const password = process.argv[3];
