@@ -82,6 +82,7 @@ export default function AdminSequences() {
       setForm({ scheduled_date: '', topic: '', assigned_trainer_id: '', instructions: '' });
       if (!weeks.includes(week_start_date)) setWeeks([week_start_date, ...weeks]);
       setSelectedWeek(week_start_date);
+      load();
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to save sequence'));
     } finally {
