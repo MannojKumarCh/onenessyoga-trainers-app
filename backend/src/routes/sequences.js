@@ -353,13 +353,27 @@ router.put('/:id', authenticate, requireRole('super_admin', 'sequence_creator'),
     await ensureTrainerExists(nextTrainerId);
   }
 
+  const nextTopic = topic ?? seq.topic;
+  const nextScheduledDate = scheduled_date ?? seq.scheduled_date;
+  const finalTrainerId = nextTrainerId ?? seq.assigned_trainer_id;
+  const nextInstructions = instructions ?? seq.instructions;
+
+  // A previously-notified trainer was told about the old details - if
+  // anything actually changed, clear notified_trainer_at so the "Notify"
+  // action reappears for the creator to re-send with the updated info.
+  const changed = nextTopic !== seq.topic
+    || nextScheduledDate !== seq.scheduled_date
+    || finalTrainerId !== seq.assigned_trainer_id
+    || nextInstructions !== seq.instructions;
+
   await prisma.sequence.update({
     where: { id },
     data: {
-      topic: topic ?? seq.topic,
-      scheduled_date: scheduled_date ?? seq.scheduled_date,
-      assigned_trainer_id: nextTrainerId ?? seq.assigned_trainer_id,
-      instructions: instructions ?? seq.instructions
+      topic: nextTopic,
+      scheduled_date: nextScheduledDate,
+      assigned_trainer_id: finalTrainerId,
+      instructions: nextInstructions,
+      notified_trainer_at: changed ? null : seq.notified_trainer_at
     }
   });
 
