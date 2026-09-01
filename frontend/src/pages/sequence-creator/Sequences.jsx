@@ -5,6 +5,7 @@ import { format, startOfWeek } from 'date-fns';
 import { ExclamationTriangleIcon, QueueListIcon, PlusIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import TopicSelect from '../../components/TopicSelect';
 import Modal from '../../components/Modal';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import SequenceFilters from '../../components/SequenceFilters';
 import SessionThumb from '../../components/SessionThumb';
 import { getApiErrorMessage } from '../../utils/apiError';
@@ -22,11 +23,14 @@ export default function CreatorSequences() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ scheduled_date: '', topic: '', assigned_trainer_id: '', instructions: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [notifying, setNotifying] = useState(false);
   const [notice, setNotice] = useState({ type: '', text: '' });
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [showAiSchedule, setShowAiSchedule] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
@@ -75,6 +79,30 @@ export default function CreatorSequences() {
 
   usePolling(() => load(true), 30000);
 
+  function openAdd() {
+    setEditingId(null);
+    setForm({ scheduled_date: '', topic: '', assigned_trainer_id: '', instructions: '' });
+    setError('');
+    setShowForm(true);
+  }
+
+  function openEdit(seq) {
+    setEditingId(seq.id);
+    setForm({
+      scheduled_date: seq.scheduled_date,
+      topic: seq.topic,
+      assigned_trainer_id: seq.assigned_trainer_id || '',
+      instructions: seq.instructions || ''
+    });
+    setError('');
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setEditingId(null);
+  }
+
   async function submit(e) {
     e.preventDefault();
     setError('');
@@ -86,18 +114,42 @@ export default function CreatorSequences() {
         return;
       }
 
-      const week_start_date = getWeekStart(form.scheduled_date);
-      await client.post('/sequences', { ...form, assigned_trainer_id: assignedTrainerId, week_start_date });
-      setShowForm(false);
+      if (editingId) {
+        await client.put(`/sequences/${editingId}`, {
+          topic: form.topic,
+          assigned_trainer_id: assignedTrainerId,
+          instructions: form.instructions
+        });
+        showToast('Sequence Updated');
+      } else {
+        const week_start_date = getWeekStart(form.scheduled_date);
+        await client.post('/sequences', { ...form, assigned_trainer_id: assignedTrainerId, week_start_date });
+        if (!weeks.includes(week_start_date)) setWeeks([week_start_date, ...weeks]);
+        setSelectedWeek(week_start_date);
+        showToast('Sequence Assigned Successfully');
+      }
+      closeForm();
       setForm({ scheduled_date: '', topic: '', assigned_trainer_id: '', instructions: '' });
-      const w = week_start_date;
-      if (!weeks.includes(w)) setWeeks([w, ...weeks]);
-      setSelectedWeek(w);
-      showToast('Sequence Assigned Successfully');
+      load();
     } catch (err) {
       setError(getApiErrorMessage(err, 'Failed to save sequence'));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function deleteSeq(id) {
+    setDeleting(true);
+    try {
+      await client.delete(`/sequences/${id}`);
+      setDeleteId(null);
+      showToast('Sequence Deleted');
+      load();
+    } catch (err) {
+      setNotice({ type: 'error', text: getApiErrorMessage(err, 'Failed to delete sequence') });
+      setDeleteId(null);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -202,7 +254,7 @@ export default function CreatorSequences() {
               ? 'Daily AI Limit Reached'
               : `Generate AI Schedule${aiUsage ? ` (${aiUsage.remaining} left today)` : ''}`}
           </button>
-          <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setShowForm(true)}>
+          <button className="btn btn-primary" style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 }} onClick={openAdd}>
             <PlusIcon style={{ width: 16, height: 16 }} /> Assign Sequence
           </button>
         </div>
@@ -282,18 +334,38 @@ export default function CreatorSequences() {
               <a href={seq.google_sheet_link} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 12, color: 'var(--primary)', marginTop: 4, display: 'block' }}>View Sheet</a>
             )}
           </div>
-          {!seq.notified_trainer_at && (
-            <button className="btn btn-outline" style={{ fontSize: 12, padding: '4px 10px' }} onClick={e => { e.stopPropagation(); notifySingle(seq.id); }}>Notify</button>
-          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
+            {!seq.notified_trainer_at && (
+              <button className="btn btn-outline" style={{ fontSize: 12, padding: '4px 10px' }} onClick={e => { e.stopPropagation(); notifySingle(seq.id); }}>Notify</button>
+            )}
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button onClick={e => { e.stopPropagation(); openEdit(seq); }} style={{ color: 'var(--primary)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Edit</button>
+              <button onClick={e => { e.stopPropagation(); setDeleteId(seq.id); }} style={{ color: 'var(--danger)', fontSize: 12, padding: '4px 8px', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
+            </div>
+          </div>
         </div>
       ))}
 
       {showForm && (
-        <Modal title="Assign Sequence" onClose={() => setShowForm(false)}>
+        <Modal title={editingId ? 'Edit Sequence' : 'Assign Sequence'} onClose={closeForm}>
             <form onSubmit={submit}>
               <div className="form-group">
                 <label className="label" htmlFor="creator-seq-date">Date</label>
-                <input id="creator-seq-date" className="input" type="date" min={minScheduledDate} value={form.scheduled_date} onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))} required />
+                <input
+                  id="creator-seq-date"
+                  className="input"
+                  type="date"
+                  min={minScheduledDate}
+                  value={form.scheduled_date}
+                  onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))}
+                  disabled={Boolean(editingId)}
+                  required
+                />
+                {editingId && (
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                    Date can't be changed here — delete and re-assign to move it to a different day.
+                  </p>
+                )}
               </div>
               <div className="form-group">
                 <label className="label" htmlFor="creator-seq-topic">Topic</label>
@@ -312,13 +384,24 @@ export default function CreatorSequences() {
               </div>
               {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
               <div style={{ display: 'flex', gap: 10 }}>
-                <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setShowForm(false)}>Cancel</button>
+                <button type="button" className="btn btn-ghost" style={{ flex: 1 }} onClick={closeForm}>Cancel</button>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }} disabled={submitting}>
-                  {submitting ? 'Saving…' : 'Assign'}
+                  {submitting ? 'Saving…' : editingId ? 'Save Changes' : 'Assign'}
                 </button>
               </div>
             </form>
         </Modal>
+      )}
+
+      {deleteId != null && (
+        <ConfirmDialog
+          title="Delete Sequence"
+          message="Delete this sequence? This cannot be undone."
+          confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+          danger
+          onCancel={() => setDeleteId(null)}
+          onConfirm={() => deleteSeq(deleteId)}
+        />
       )}
 
       {showAiSchedule && (
