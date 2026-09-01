@@ -558,6 +558,30 @@ No schema/migration changes - pure frontend fix, deployed to `tdev.onenessyoga.i
 
 ---
 
+## 32. Reference link readability, admin Resources URL overflow, and sequence-creator Edit/Delete (2026-09-01)
+
+Three small fixes/additions from live user testing:
+
+- **Reference link showed only the word "Reference"**: `SessionDetail.jsx` and `SequenceDetail.jsx` rendered a sequence item's `reference_url` as a bare "Reference" label with the actual URL hidden behind it. Added `truncateUrl(value, max = 40)` to both files - the link text now shows the URL itself (truncated with `…` past 40 characters), with the full URL still available via the `title` tooltip and the `href`.
+- **Admin Resources screen: URLs overflowing and not clickable**: `admin/Resources.jsx` rendered a link item's `.url` as plain text with no wrap styling, so long URLs spilled outside the card, and there was no way to open the link from that screen at all. Now renders as a clickable `<a>` with `word-break: break-all`. (`trainer/Resources.jsx` already displayed "Open Link" instead of the raw URL, so it never had this bug.)
+- **Sequence-creator Sequences screen: no Edit or Delete**: the backend already allowed `sequence_creator` to `PUT`/`DELETE` a sequence (`backend/src/routes/sequences.js`), but the creator's own screen only ever exposed Add and per-row Notify - once assigned, there was no way to change the topic, reassign the trainer, or remove it. Added Edit (reuses the existing "Assign Sequence" modal, pre-filled; the date field is disabled in edit mode since changing it would leave `week_start_date` pointing at the wrong week - delete-and-reassign is the path for moving a sequence to a different day) and Delete (existing `ConfirmDialog` pattern, matching `admin/Sequences.jsx`).
+
+Verified the Edit/Delete backend calls directly against the live dev API (not just the UI): `PUT` on a real sequence changed topic + trainer, confirmed, reverted; created a throwaway sequence, `DELETE`d it, confirmed a subsequent `GET` returned 404. `npm run build` clean. No schema changes. Deployed to dev then prod the same day.
+
+---
+
+## 33. Two "list doesn't refresh after creating" bugs, and Notify not reappearing after an edit (2026-09-01)
+
+Found while testing §32's Edit feature.
+
+**Bug**: creating a sequence for a day within the *currently selected* week didn't show up in the list until a full app reload. Root cause: after `POST /sequences`, both `sequence-creator/Sequences.jsx` and `admin/Sequences.jsx` called `setSelectedWeek(week_start_date)` to switch the view to the new sequence's week - but when that week is already the one being viewed, React treats it as a no-op (same value) and skips re-rendering, so the `useEffect` that reloads the list on `selectedWeek` change never fires. The sequence saved correctly; the screen just never asked for fresh data. Confirmed via direct API testing that the backend always reflected the new row immediately - this was a pure frontend gap. Fixed by adding an unconditional `load()` call right after a successful save in both files, instead of relying solely on the state-change effect.
+
+**Bug**: after a sequence had been notified (`notified_trainer_at` set) and the creator then edited its topic/trainer/instructions, the "Notify" action never reappeared - the trainer was left looking at stale details with no way for the creator to re-send. `PUT /sequences/:id` now clears `notified_trainer_at` whenever topic, scheduled_date, assigned_trainer_id, or instructions actually changes (compared against the stored row, not just whether the field was present in the request) - a save with unchanged values correctly leaves the flag alone. No frontend change needed since the "Notify" button already keys off `!seq.notified_trainer_at` and the screen already reloads after saving (from the fix above).
+
+Verified both directly against the live dev API: created a sequence for a day in the already-selected week, confirmed the list count updated without a page reload; notified a real sequence, edited its topic, confirmed `notified_trainer_at` reset to `null`; re-notified, then saved with the *identical* topic, confirmed the flag was untouched (no spurious re-notify prompt). All test data reverted afterward. No schema changes. Deployed to dev then prod the same day.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).
