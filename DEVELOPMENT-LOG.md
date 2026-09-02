@@ -599,6 +599,23 @@ Not yet deployed to prod - dev only per standing policy, pending user testing.
 
 ---
 
+## 35. Switch AI weekly-schedule generation from free OpenRouter to the Anthropic API (2026-09-01)
+
+The Sequence Creator's "Generate AI Schedule" feature was calling a free OpenRouter model (`google/gemma-4-31b-it:free`), which was frequently returning "overloaded" errors from the upstream provider and failing generations. User asked whether their Claude Pro subscription could power this instead - it can't, since Pro is a consumer login (claude.ai/Claude Code), not a credential a backend server can call; the Anthropic API is billed separately, per token. Since this task (turn a short rules prompt into a 6-day JSON array) is simple structured generation rather than complex reasoning, switched to calling the Anthropic API directly with `claude-haiku-4-5` (cheapest current model) - cost stays effectively negligible even at the existing 5-generations/day cap.
+
+- `backend/src/utils/aiScheduler.js`: replaced the whole OpenRouter call layer (`callOpenRouterOnce`/`callOpenRouter`, manual timeout/abort handling, empty-content retry loop, `OPENROUTER_API_KEY`/`OPENROUTER_MODEL`) with a single `callClaude(prompt)` using `@anthropic-ai/sdk`'s `messages.create`. Everything else in the file - `SESSION_TYPES`, `RULES`, `getNextWeekRange`, `buildPrompt`, `parseScheduleResponse`, the daily-usage/rate-limit bookkeeping - is untouched.
+- Follows the same lazy-external-client pattern already used for `resend` in `utils/mail.js`: `const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ... }) : null;`, with `generateWeeklySchedule()`'s existing `{ configured: false }` fallback now keyed off that instead of the old key check - verified locally with the key unset.
+- No manual retry-on-empty-content needed - the Anthropic SDK's client already retries 408/409/429/5xx and connection errors automatically (default `max_retries: 2`); a `stop_reason === 'refusal'` check handles Claude declining to answer, which the old code had no equivalent for.
+- `OpenRouterRateLimitError` renamed to `AiScheduleRateLimitError` (now thrown on `Anthropic.RateLimitError`, the SDK's typed exception, instead of matching on OpenRouter's HTTP 429 body) - the one call site in `routes/sequences.js`'s `POST /sequences/ai-schedule` needed only the renamed import; the 503 "not configured" / 429 "daily limit" / generic-500 behavior around it, and the frontend, are unchanged.
+- Each AI feature in the app now gets its own model env var (this one is `ANTHROPIC_SCHEDULER_MODEL`, defaulting to `claude-haiku-4-5` in code) while sharing one `ANTHROPIC_API_KEY` - answering the user's forward-looking question about wiring a future AI feature to a different (e.g. more capable/expensive) model: it just declares its own `ANTHROPIC_<FEATURE>_MODEL` constant in its own file, no shared code to touch.
+- Added `@anthropic-ai/sdk` to `backend/package.json`; confirmed it resolves under this backend's CommonJS (`require`, not ESM import) setup.
+
+`OPENROUTER_API_KEY`/`OPENROUTER_MODEL` left in both `.env` files unused (harmless) rather than removed - not required for this change to function.
+
+Not yet deployed to prod - pending the user adding `ANTHROPIC_API_KEY` to the dev VM's `.env` and a live end-to-end generation test on `tdev.onenessyoga.in`.
+
+---
+
 ## Dev environment data reset (2026-08-20)
 
 Ahead of a fresh testing pass on multi-role support and the topic-image work, the dev VM's `Sequence`, `SequenceItem` (cascaded), `Session`, `Notification`, and `AiScheduleLog` tables were wiped clean (`Users`, `Leaves`, and `Resources` were left untouched, then `Leaves` was cleared separately on request). A `pg_dump` backup was taken immediately before (`oneness_trainers_dev_pre_data_wipe_20260820181722.sql` on the VM, under `/home/onenessdev/db_backups/`).

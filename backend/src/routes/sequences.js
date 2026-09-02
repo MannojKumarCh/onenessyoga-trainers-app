@@ -5,7 +5,7 @@ const { authenticate, requireRole, getUserRoles } = require('../middleware/auth'
 const { notifyUser, notifyAll } = require('../utils/notify');
 const asyncHandler = require('../utils/asyncHandler');
 const { upsertSequenceInSheet } = require('../utils/sheets');
-const { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration, OpenRouterRateLimitError } = require('../utils/aiScheduler');
+const { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration, AiScheduleRateLimitError } = require('../utils/aiScheduler');
 const { ensureTrainerExists, ensureTrainersExist } = require('../utils/trainers');
 const validateIdParam = require('../middleware/validateIdParam');
 
@@ -240,7 +240,7 @@ router.post('/ai-schedule', authenticate, requireRole('sequence_creator'), aiSch
   try {
     result = await generateWeeklySchedule();
   } catch (err) {
-    if (err instanceof OpenRouterRateLimitError) {
+    if (err instanceof AiScheduleRateLimitError) {
       return res.status(502).json({ error: err.message });
     }
     throw err;

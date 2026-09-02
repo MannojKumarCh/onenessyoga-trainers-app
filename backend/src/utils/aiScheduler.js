@@ -1,8 +1,12 @@
 const prisma = require('../db/db');
+const Anthropic = require('@anthropic-ai/sdk');
 
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'google/gemma-4-31b-it:free';
-const OPENROUTER_TIMEOUT_MS = 60 * 1000;
+// Each AI feature in this app gets its own model env var (this one is the
+// scheduler's) while all of them share one ANTHROPIC_API_KEY - a future
+// feature needing a different model just declares its own constant in its
+// own file, no shared code to touch.
+const ANTHROPIC_SCHEDULER_MODEL = process.env.ANTHROPIC_SCHEDULER_MODEL || 'claude-haiku-4-5';
+const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
 
 const DAILY_LIMIT = 5;
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // IST has no DST, fixed UTC+5:30 offset
@@ -156,86 +160,34 @@ Respond with ONLY a JSON array (no prose, no markdown code fences) of exactly 6 
   return { system, user };
 }
 
-class OpenRouterRateLimitError extends Error {}
+class AiScheduleRateLimitError extends Error {}
 
-// One bounded attempt. Returns the content string, or null if the model
-// replied successfully but with no content (caller decides whether to retry).
-async function callOpenRouterOnce(prompt) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
-
+async function callClaude(prompt) {
   let response;
   try {
-    response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: OPENROUTER_MODEL,
-        messages: [
-          { role: 'system', content: prompt.system },
-          { role: 'user', content: prompt.user }
-        ],
-        temperature: 0.7
-      }),
-      signal: controller.signal
+    response = await anthropic.messages.create({
+      model: ANTHROPIC_SCHEDULER_MODEL,
+      max_tokens: 1024,
+      system: prompt.system,
+      messages: [{ role: 'user', content: prompt.user }]
     });
   } catch (err) {
-    if (err.name === 'AbortError') {
-      throw new Error(`OpenRouter request timed out after ${OPENROUTER_TIMEOUT_MS / 1000}s`);
+    if (err instanceof Anthropic.RateLimitError) {
+      throw new AiScheduleRateLimitError('Anthropic API rate limit reached. Try again shortly.');
     }
     throw err;
-  } finally {
-    clearTimeout(timeout);
   }
 
-  if (response.status === 429) {
-    const body = await response.json().catch(() => null);
-    const upstreamReason = body?.error?.metadata?.raw || body?.error?.message;
-    throw new OpenRouterRateLimitError(
-      upstreamReason
-        ? `OpenRouter rate limit: ${upstreamReason}`
-        : "OpenRouter's free-tier rate limit was reached. Try again later, or add credits to the OpenRouter account to raise the limit."
-    );
+  if (response.stop_reason === 'refusal') {
+    throw new Error('Claude declined to generate a schedule');
   }
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`OpenRouter request failed (${response.status}): ${text}`);
+  const text = response.content.find(b => b.type === 'text')?.text;
+  if (!text) {
+    throw new Error('Claude response had no text content');
   }
 
-  const data = await response.json();
-
-  // OpenRouter sometimes proxies an upstream provider failure as HTTP 200
-  // with an `error` field instead of `choices` - surface that reason
-  // directly rather than silently falling through to "no content".
-  if (data.error) {
-    const reason = data.error.metadata?.raw || data.error.message || 'unknown upstream error';
-    throw new Error(`OpenRouter/upstream provider error: ${reason}`);
-  }
-
-  return data.choices?.[0]?.message?.content || null;
-}
-
-async function callOpenRouter(prompt) {
-  if (!OPENROUTER_API_KEY) {
-    console.warn('OPENROUTER_API_KEY not configured — AI scheduling unavailable');
-    return null;
-  }
-
-  // Some free-tier "reasoning" models occasionally spend their whole budget
-  // thinking and return an empty final answer - one retry usually succeeds.
-  let content = await callOpenRouterOnce(prompt);
-  if (!content) {
-    content = await callOpenRouterOnce(prompt);
-  }
-  if (!content) {
-    throw new Error('OpenRouter response had no content (after retry)');
-  }
-
-  return content;
+  return text;
 }
 
 function parseScheduleResponse(content, expectedDays) {
@@ -265,7 +217,7 @@ function parseScheduleResponse(content, expectedDays) {
 }
 
 async function generateWeeklySchedule() {
-  if (!OPENROUTER_API_KEY) {
+  if (!anthropic) {
     return { configured: false };
   }
 
@@ -283,10 +235,10 @@ async function generateWeeklySchedule() {
   });
 
   const prompt = buildPrompt({ days, history });
-  const content = await callOpenRouter(prompt);
+  const content = await callClaude(prompt);
   const schedule = parseScheduleResponse(content, days);
 
   return { configured: true, week_start_date, days: schedule };
 }
 
-module.exports = { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration, OpenRouterRateLimitError };
+module.exports = { generateWeeklySchedule, getDailyUsage, logSuccessfulGeneration, AiScheduleRateLimitError };
