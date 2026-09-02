@@ -612,7 +612,9 @@ The Sequence Creator's "Generate AI Schedule" feature was calling a free OpenRou
 
 `OPENROUTER_API_KEY`/`OPENROUTER_MODEL` left in both `.env` files unused (harmless) rather than removed - not required for this change to function.
 
-Not yet deployed to prod - pending the user adding `ANTHROPIC_API_KEY` to the dev VM's `.env` and a live end-to-end generation test on `tdev.onenessyoga.in`.
+**Tested in dev**: with `ANTHROPIC_API_KEY` added to `tdev`'s `.env` and the Anthropic account funded, ran one real `POST /sequences/ai-schedule` call as a sequence_creator - got back a valid 6-day schedule (Pilates present, a restorative session the day after it, one intense session, the Chandra/Surya Namaskar mandate met) and the daily-usage counter correctly moved to `1/5`. Deliberately made only that single call to avoid spending API credits unnecessarily.
+
+**Prod**: code, the new `@anthropic-ai/sdk` dependency, and `ANTHROPIC_API_KEY` are all deployed/live on `trainers.onenessyoga.in` (backend restarted cleanly, no errors) - but no generation has been run there yet, per explicit instruction not to spend prod credits during deployment. Prod testing is pending an actual "Generate AI Schedule" run by the sequence creator.
 
 ---
 
