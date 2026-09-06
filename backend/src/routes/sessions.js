@@ -76,9 +76,13 @@ async function getSequenceForDate(date) {
   };
 }
 
+// Kids Yoga sessions have their own dedicated content model
+// (KidsYogaLesson) and must never pick up a same-date Sequence meant for a
+// different slot/trainer - the date-only matching above is only valid
+// between regular sessions.
 function serialize(session, topicByDate = new Map()) {
   const { assigned_trainer, backup_trainer, ...rest } = session;
-  const seqInfo = topicByDate.get(session.scheduled_date);
+  const seqInfo = session.session_type === 'Kids Yoga' ? null : topicByDate.get(session.scheduled_date);
   return {
     ...rest,
     title: seqInfo?.topic ?? rest.title,
@@ -91,7 +95,7 @@ function serialize(session, topicByDate = new Map()) {
 
 function serializeWithZoom(session, topicByDate = new Map()) {
   const { assigned_trainer, backup_trainer, ...rest } = session;
-  const seqInfo = topicByDate.get(session.scheduled_date);
+  const seqInfo = session.session_type === 'Kids Yoga' ? null : topicByDate.get(session.scheduled_date);
   return {
     ...rest,
     title: seqInfo?.topic ?? rest.title,
@@ -180,9 +184,11 @@ router.get('/:id', authenticate, async (req, res) => {
   if (isTrainerOnly && !isParty) {
     return res.status(403).json({ error: 'Forbidden' });
   }
+  // Kids Yoga sessions never carry Sequence content - they have their own
+  // dedicated kids_yoga_lesson instead (see serializeWithZoom above).
   const [topicByDate, sequence] = await Promise.all([
     getSequenceTopicByDate([session.scheduled_date]),
-    getSequenceForDate(session.scheduled_date)
+    session.session_type === 'Kids Yoga' ? Promise.resolve(null) : getSequenceForDate(session.scheduled_date)
   ]);
   res.json({ ...serializeWithZoom(session, topicByDate), sequence });
 });
