@@ -140,6 +140,12 @@ async function callClaude(prompt) {
       // truncating mid-JSON, which surfaces as a confusing "not valid JSON"
       // error instead of the real cause.
       max_tokens: 3500,
+      // Sonnet 5 runs adaptive extended thinking by default even without
+      // asking for it, and thinking tokens count against max_tokens - on a
+      // plain formulaic writing task like this (no real reasoning needed),
+      // that silently ate into the budget meant for the actual answer and
+      // caused truncation. Disabling it here frees the whole cap for content.
+      thinking: { type: 'disabled' },
       system: prompt.system,
       messages: [{ role: 'user', content: prompt.user }]
     });
@@ -168,7 +174,18 @@ async function callClaude(prompt) {
 const REQUIRED_FIELDS = ['opening', 'warmups', 'narrative_sequence', 'closing_shanti', 'summary'];
 
 function parseLessonResponse(content) {
-  const cleaned = content.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  let cleaned = content.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+
+  // Defensive: if the model added any stray text before/after the object
+  // despite being told to respond with only JSON, extract just the {...}
+  // span rather than failing on the whole string.
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start > 0 || (end !== -1 && end < cleaned.length - 1)) {
+    if (start !== -1 && end !== -1 && end > start) {
+      cleaned = cleaned.slice(start, end + 1);
+    }
+  }
 
   let parsed;
   try {
