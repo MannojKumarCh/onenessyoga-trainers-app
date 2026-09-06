@@ -133,7 +133,13 @@ async function callClaude(prompt) {
   try {
     response = await anthropic.messages.create({
       model: ANTHROPIC_KIDS_LESSON_MODEL,
-      max_tokens: 2200,
+      // The prompt's own word targets are what actually keep the output
+      // concise - this is just a safety ceiling, kept generous because the
+      // response has to fit the brevity target AND valid JSON escaping
+      // (quotes, newlines) on top of it. A tight cap here risks silently
+      // truncating mid-JSON, which surfaces as a confusing "not valid JSON"
+      // error instead of the real cause.
+      max_tokens: 3500,
       system: prompt.system,
       messages: [{ role: 'user', content: prompt.user }]
     });
@@ -146,6 +152,9 @@ async function callClaude(prompt) {
 
   if (response.stop_reason === 'refusal') {
     throw new Error('Claude declined to generate a lesson');
+  }
+  if (response.stop_reason === 'max_tokens') {
+    throw new Error('Claude response was cut off (hit the token limit) - try again');
   }
 
   const text = response.content.find(b => b.type === 'text')?.text;
@@ -165,6 +174,9 @@ function parseLessonResponse(content) {
   try {
     parsed = JSON.parse(cleaned);
   } catch (err) {
+    // Log a snippet so a future failure is diagnosable from server logs
+    // alone, without needing to reproduce it with another paid API call.
+    console.error('Kids Yoga lesson JSON parse failed. Response start:', cleaned.slice(0, 300), '... end:', cleaned.slice(-300));
     throw new Error('AI response was not valid JSON');
   }
 
