@@ -6,8 +6,7 @@ import {
   QueueListIcon,
   BookOpenIcon,
   HomeIcon,
-  CheckBadgeIcon,
-  SparklesIcon
+  CheckBadgeIcon
 } from '@heroicons/react/24/outline';
 
 // Precedence when a user has multiple roles: later roles win on a path
@@ -25,12 +24,10 @@ const TRAINER_NAV = [
 
 export const NAV_BY_ROLE = {
   trainer: TRAINER_NAV,
-  // Kids Yoga Trainer gets every regular trainer tab, plus its own
-  // self-service AI session generator.
-  kids_yoga_trainer: [
-    ...TRAINER_NAV,
-    { to: '/new-kids-session', label: 'New Session', Icon: SparklesIcon }
-  ],
+  // Kids Yoga Trainer's distinct feature (generating a lesson with AI) lives
+  // inline on SessionDetail itself, not a separate nav tab - otherwise it's
+  // identical to a regular trainer.
+  kids_yoga_trainer: TRAINER_NAV,
   sequence_creator: [
     { to: '/sequences', label: 'Sequences', Icon: QueueListIcon, exact: true }
   ],

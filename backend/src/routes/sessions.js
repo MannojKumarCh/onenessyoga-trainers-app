@@ -102,7 +102,11 @@ router.get('/my', authenticate, requireRole('trainer', 'kids_yoga_trainer'), asy
       scheduled_date: { gte: today },
       is_completed: false
     },
-    include: { assigned_trainer: { select: { name: true } }, backup_trainer: { select: { name: true } } },
+    include: {
+      assigned_trainer: { select: { name: true } },
+      backup_trainer: { select: { name: true } },
+      kids_yoga_lesson: { select: { id: true } }
+    },
     orderBy: [{ scheduled_date: 'asc' }, { scheduled_time: 'asc' }]
   });
   const topicByDate = await getSequenceTopicByDate(sessions.map(s => s.scheduled_date));

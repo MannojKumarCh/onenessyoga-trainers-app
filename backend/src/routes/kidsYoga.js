@@ -88,13 +88,18 @@ router.post('/generate', authenticate, requireRole('kids_yoga_trainer'), kidsLes
   res.json({ ...result.lesson, used: usage.used + 1, remaining: usage.remaining - 1, limit: usage.limit });
 });
 
-// Kids Yoga Trainer: freeze one previously-generated draft as the real class
-// for that date - creates the Session, exports the lesson to Google Drive
-// (best-effort), and saves the KidsYogaLesson row.
+// Kids Yoga Trainer: freeze one previously-generated draft as the real class -
+// exports the lesson to Google Drive (best-effort) and saves the
+// KidsYogaLesson row. Two ways to call this:
+// - `session_id`: attach to an already-scheduled session (the normal case -
+//   Kids Yoga runs on a recurring Weekly Schedule slot, so the Session
+//   already exists; the trainer is just filling in that day's content).
+// - `scheduled_date`/`scheduled_time`: find-or-create a session for that
+//   date (fallback for a one-off session outside the recurring schedule).
 router.post('/freeze', authenticate, requireRole('kids_yoga_trainer'), async (req, res) => {
-  const { scheduled_date, scheduled_time } = req.body;
-  if (!scheduled_date || !scheduled_time) {
-    throw httpError(400, 'scheduled_date and scheduled_time are required');
+  const { session_id, scheduled_date, scheduled_time } = req.body;
+  if (!session_id && (!scheduled_date || !scheduled_time)) {
+    throw httpError(400, 'session_id, or scheduled_date and scheduled_time, are required');
   }
 
   const {
@@ -110,26 +115,43 @@ router.post('/freeze', authenticate, requireRole('kids_yoga_trainer'), async (re
     if (!value || !String(value).trim()) throw httpError(400, `${field} is required`);
   }
 
-  const existing = await prisma.session.findFirst({
-    where: { assigned_trainer_id: req.user.id, scheduled_date, session_type: 'Kids Yoga' }
-  });
-  if (existing) {
-    throw httpError(409, 'A Kids Yoga session is already frozen for this date');
+  let session;
+  if (session_id) {
+    const target = await prisma.session.findUnique({
+      where: { id: parseInt(session_id) },
+      include: { kids_yoga_lesson: { select: { id: true } } }
+    });
+    if (!target || target.assigned_trainer_id !== req.user.id || target.session_type !== 'Kids Yoga') {
+      throw httpError(404, 'Kids Yoga session not found');
+    }
+    if (target.kids_yoga_lesson) {
+      throw httpError(409, 'This session already has a frozen lesson');
+    }
+    session = await prisma.session.update({ where: { id: target.id }, data: { title: primary_theme } });
+  } else {
+    const existing = await prisma.session.findFirst({
+      where: { assigned_trainer_id: req.user.id, scheduled_date, session_type: 'Kids Yoga' },
+      include: { kids_yoga_lesson: { select: { id: true } } }
+    });
+    if (existing?.kids_yoga_lesson) {
+      throw httpError(409, 'A Kids Yoga session is already frozen for this date');
+    }
+    session = existing
+      ? await prisma.session.update({ where: { id: existing.id }, data: { title: primary_theme, scheduled_time } })
+      : await prisma.session.create({
+          data: {
+            title: primary_theme,
+            scheduled_date,
+            scheduled_time,
+            session_type: 'Kids Yoga',
+            assigned_trainer_id: req.user.id,
+            created_by: req.user.id
+          }
+        });
   }
 
-  const session = await prisma.session.create({
-    data: {
-      title: primary_theme,
-      scheduled_date,
-      scheduled_time,
-      session_type: 'Kids Yoga',
-      assigned_trainer_id: req.user.id,
-      created_by: req.user.id
-    }
-  });
-
   const driveFile = await uploadKidsYogaLessonFile({
-    scheduled_date,
+    scheduled_date: session.scheduled_date,
     primary_theme,
     narrative_background,
     target_age_range,

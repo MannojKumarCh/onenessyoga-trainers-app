@@ -104,6 +104,8 @@ Deliver a structured 40-minute yoga lesson plan divided into four distinct phase
 4. Closing/Shanti (5 mins): Guided relaxation based on ${relaxationSetting}.
 Each section should include specific timing and instructions for the teacher.
 
+Write tight and scannable, not flowing prose - a teacher needs to glance at this mid-class, not read a story. Use short cue lines (a timestamp/pose name followed by one or two punchy sentences of instruction or things to say), not paragraphs. Target roughly: Opening 80-120 words, Warmups 150-200 words, Narrative Sequence 300-400 words, Closing/Shanti 80-120 words. Be precise and to the point - cut anything that doesn't help a teacher run the class in the moment.
+
 ### STEPS
 1. Introduce the session theme with a short, captivating story snippet based on ${primaryTheme} to grab the children's attention immediately.
 2. Develop a series of warm-up movements that introduce the environment or the "journey" the children are about to embark on.
@@ -126,7 +128,7 @@ async function callClaude(prompt) {
   try {
     response = await anthropic.messages.create({
       model: ANTHROPIC_KIDS_LESSON_MODEL,
-      max_tokens: 4000,
+      max_tokens: 2200,
       system: prompt.system,
       messages: [{ role: 'user', content: prompt.user }]
     });

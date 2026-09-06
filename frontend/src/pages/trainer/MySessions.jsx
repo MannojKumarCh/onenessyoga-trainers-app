@@ -46,6 +46,7 @@ export default function MySessions() {
               <div className="list-item-left">
                 <div className="list-item-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {s.title} {s.viewer_role === 'backup' && <span className="badge badge-info">Backup</span>}
+                  {s.session_type === 'Kids Yoga' && !s.kids_yoga_lesson && <span className="badge badge-pending">Needs Lesson</span>}
                 </div>
                 <div className="list-item-sub">
                   {s.scheduled_time} · {s.session_type}
