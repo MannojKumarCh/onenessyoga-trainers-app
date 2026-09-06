@@ -152,6 +152,58 @@ router.post('/', authenticate, requireRole('super_admin', 'sequence_creator'), a
   res.status(201).json({ id: seq.id });
 });
 
+// Monday (0=Sun..6=Sat convention, same as SessionTemplate.weekdays) of the
+// week containing the given "YYYY-MM-DD" date - sequences are grouped by
+// week_start_date regardless of how they were created.
+function mondayOfWeek(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  const day = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() + (day === 0 ? -6 : 1 - day));
+  return d.toISOString().split('T')[0];
+}
+
+// Kids Yoga trainer: self-service "Create Manually" alternative to the AI
+// lesson generator - creates the Sequence container for their own Kids Yoga
+// session (no Sequence Creator involved, unlike the regular assignment
+// flow). Item content is then added the same way any trainer builds a
+// sequence today - via POST /:id/build on the returned sequence.
+router.post('/kids-yoga', authenticate, requireRole('kids_yoga_trainer'), async (req, res) => {
+  const { session_id, topic } = req.body;
+  const sessionId = parsePositiveInt(session_id, 'session_id');
+  const trimmedTopic = String(topic || '').trim();
+  if (!trimmedTopic) throw httpError(400, 'topic is required');
+
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    include: { kids_yoga_lesson: { select: { id: true } } }
+  });
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  if (session.assigned_trainer_id !== req.user.id || session.session_type !== 'Kids Yoga') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  if (session.kids_yoga_lesson) {
+    throw httpError(409, 'This session already has an AI-generated lesson.');
+  }
+  const existing = await prisma.sequence.findFirst({
+    where: { assigned_trainer_id: req.user.id, scheduled_date: session.scheduled_date }
+  });
+  if (existing) {
+    throw httpError(409, 'A sequence already exists for this session.');
+  }
+
+  const seq = await prisma.sequence.create({
+    data: {
+      week_start_date: mondayOfWeek(session.scheduled_date),
+      scheduled_date: session.scheduled_date,
+      topic: trimmedTopic,
+      assigned_trainer_id: req.user.id,
+      created_by: req.user.id
+    }
+  });
+
+  res.status(201).json({ id: seq.id });
+});
+
 // Sequence creator: bulk-create a week's worth of sequences (e.g. confirming
 // an AI-generated schedule). All-or-nothing - createMany is one atomic INSERT.
 router.post('/bulk', authenticate, requireRole('sequence_creator'), async (req, res) => {

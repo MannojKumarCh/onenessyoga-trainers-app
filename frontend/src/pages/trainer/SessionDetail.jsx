@@ -9,7 +9,7 @@ import usePolling from '../../hooks/usePolling';
 import { useToast } from '../../context/ToastContext';
 import { getSessionImageUrl } from '../../config/sessionImages';
 import { useAuth } from '../../context/AuthContext';
-import KidsLessonGenerator from '../../components/KidsLessonGenerator';
+import KidsSequenceChoice from '../../components/KidsSequenceChoice';
 
 function isLikelyUrl(value) {
   return /^https?:\/\//i.test(value.trim());
@@ -204,8 +204,8 @@ export default function SessionDetail() {
             </a>
           )}
         </div>
-      ) : session.session_type === 'Kids Yoga' && session.assigned_trainer_id === user?.id && (
-        <KidsLessonGenerator session={session} onFrozen={load} />
+      ) : session.session_type === 'Kids Yoga' && session.assigned_trainer_id === user?.id && !session.sequence && (
+        <KidsSequenceChoice session={session} onFrozen={load} />
       )}
 
       <div className="form-group">

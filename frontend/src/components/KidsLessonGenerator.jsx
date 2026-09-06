@@ -257,90 +257,92 @@ export default function KidsLessonGenerator({ session, onFrozen }) {
     <div className="card" style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
       <p style={{ fontWeight: 700, margin: 0 }}>Generate Kids Yoga Lesson</p>
 
-      <div className="form-group" style={{ margin: 0 }}>
-        <label className="label" htmlFor="kids-narrative">Narrative Background</label>
-        <select
-          id="kids-narrative"
-          className="input"
-          value={form.narrative_background}
-          onChange={e => setForm(f => ({ ...f, narrative_background: e.target.value, primary_theme: '' }))}
-        >
-          <option value="">Select…</option>
-          {NARRATIVE_BACKGROUNDS.map(b => <option key={b} value={b}>{b}</option>)}
-        </select>
-      </div>
-
-      <div className="form-group" style={{ margin: 0 }}>
-        <label className="label" htmlFor="kids-theme">Primary Theme</label>
-        <select
-          id="kids-theme"
-          className="input"
-          value={form.primary_theme}
-          onChange={e => setForm(f => ({ ...f, primary_theme: e.target.value }))}
-          disabled={!form.narrative_background}
-        >
-          <option value="">{form.narrative_background ? 'Select…' : 'Choose a Narrative Background first'}</option>
-          {(NARRATIVE_THEMES[form.narrative_background] || []).map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
-      </div>
-
-      <div className="form-group" style={{ margin: 0 }}>
-        <label className="label" htmlFor="kids-age">Target Age Range</label>
-        <select id="kids-age" className="input" value={form.target_age_range} onChange={e => setForm(f => ({ ...f, target_age_range: e.target.value }))}>
-          <option value="">Select…</option>
-          {AGE_RANGES.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
-      </div>
-
-      <div className="form-group" style={{ margin: 0 }}>
-        <label className="label">Specific Yoga Poses (Optional)</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {YOGA_POSES.map(pose => (
-            <button
-              type="button"
-              key={pose}
-              onClick={() => togglePose(pose)}
-              className={`btn ${form.specific_yoga_poses.includes(pose) ? 'btn-primary' : 'btn-ghost'}`}
-              style={{ padding: '5px 10px', fontSize: 12 }}
-            >
-              {pose}
-            </button>
-          ))}
+      <fieldset disabled={generating} style={{ border: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="form-group" style={{ margin: 0 }}>
+          <label className="label" htmlFor="kids-narrative">Narrative Background</label>
+          <select
+            id="kids-narrative"
+            className="input"
+            value={form.narrative_background}
+            onChange={e => setForm(f => ({ ...f, narrative_background: e.target.value, primary_theme: '' }))}
+          >
+            <option value="">Select…</option>
+            {NARRATIVE_BACKGROUNDS.map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
         </div>
-        <input
-          className="input"
-          style={{ marginTop: 8 }}
-          placeholder="Other pose(s), comma-separated…"
-          value={form.other_pose}
-          onChange={e => setForm(f => ({ ...f, other_pose: e.target.value }))}
-        />
-      </div>
 
-      <div className="form-group" style={{ margin: 0 }}>
-        <label className="label" htmlFor="kids-relax">Relaxation Setting</label>
-        <select id="kids-relax" className="input" value={form.relaxation_setting} onChange={e => setForm(f => ({ ...f, relaxation_setting: e.target.value }))}>
-          <option value="">Select…</option>
-          {RELAXATION_SETTINGS.map(r => <option key={r} value={r}>{r}</option>)}
-        </select>
-      </div>
+        <div className="form-group" style={{ margin: 0 }}>
+          <label className="label" htmlFor="kids-theme">Primary Theme</label>
+          <select
+            id="kids-theme"
+            className="input"
+            value={form.primary_theme}
+            onChange={e => setForm(f => ({ ...f, primary_theme: e.target.value }))}
+            disabled={!form.narrative_background}
+          >
+            <option value="">{form.narrative_background ? 'Select…' : 'Choose a Narrative Background first'}</option>
+            {(NARRATIVE_THEMES[form.narrative_background] || []).map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
 
-      <div className="form-group" style={{ margin: 0 }}>
-        <label className="label" htmlFor="kids-culture">Cultural Context (Optional)</label>
-        <select id="kids-culture" className="input" value={form.cultural_context} onChange={e => setForm(f => ({ ...f, cultural_context: e.target.value }))}>
-          <option value="">None / No specific festival</option>
-          {CULTURAL_CONTEXTS.map(c => <option key={c} value={c}>{c}</option>)}
-          <option value="__other__">Other (specify)…</option>
-        </select>
-        {form.cultural_context === '__other__' && (
+        <div className="form-group" style={{ margin: 0 }}>
+          <label className="label" htmlFor="kids-age">Target Age Range</label>
+          <select id="kids-age" className="input" value={form.target_age_range} onChange={e => setForm(f => ({ ...f, target_age_range: e.target.value }))}>
+            <option value="">Select…</option>
+            {AGE_RANGES.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+        </div>
+
+        <div className="form-group" style={{ margin: 0 }}>
+          <label className="label">Specific Yoga Poses (Optional)</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {YOGA_POSES.map(pose => (
+              <button
+                type="button"
+                key={pose}
+                onClick={() => togglePose(pose)}
+                className={`btn ${form.specific_yoga_poses.includes(pose) ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ padding: '5px 10px', fontSize: 12 }}
+              >
+                {pose}
+              </button>
+            ))}
+          </div>
           <input
             className="input"
             style={{ marginTop: 8 }}
-            placeholder="e.g. a specific festival or auspicious day…"
-            value={form.other_cultural_context}
-            onChange={e => setForm(f => ({ ...f, other_cultural_context: e.target.value }))}
+            placeholder="Other pose(s), comma-separated…"
+            value={form.other_pose}
+            onChange={e => setForm(f => ({ ...f, other_pose: e.target.value }))}
           />
-        )}
-      </div>
+        </div>
+
+        <div className="form-group" style={{ margin: 0 }}>
+          <label className="label" htmlFor="kids-relax">Relaxation Setting</label>
+          <select id="kids-relax" className="input" value={form.relaxation_setting} onChange={e => setForm(f => ({ ...f, relaxation_setting: e.target.value }))}>
+            <option value="">Select…</option>
+            {RELAXATION_SETTINGS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+
+        <div className="form-group" style={{ margin: 0 }}>
+          <label className="label" htmlFor="kids-culture">Cultural Context (Optional)</label>
+          <select id="kids-culture" className="input" value={form.cultural_context} onChange={e => setForm(f => ({ ...f, cultural_context: e.target.value }))}>
+            <option value="">None / No specific festival</option>
+            {CULTURAL_CONTEXTS.map(c => <option key={c} value={c}>{c}</option>)}
+            <option value="__other__">Other (specify)…</option>
+          </select>
+          {form.cultural_context === '__other__' && (
+            <input
+              className="input"
+              style={{ marginTop: 8 }}
+              placeholder="e.g. a specific festival or auspicious day…"
+              value={form.other_cultural_context}
+              onChange={e => setForm(f => ({ ...f, other_cultural_context: e.target.value }))}
+            />
+          )}
+        </div>
+      </fieldset>
 
       {error && <p className="error-text" style={{ margin: 0 }}>{error}</p>}
 
@@ -350,9 +352,21 @@ export default function KidsLessonGenerator({ session, onFrozen }) {
         onClick={generate}
         disabled={!formComplete || generating || atCap}
       >
-        <SparklesIcon style={{ width: 16, height: 16 }} />
+        {generating ? <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> : <SparklesIcon style={{ width: 16, height: 16 }} />}
         {generating ? 'Generating…' : atCap ? 'Daily Limit Reached' : `Generate${usage ? ` (${usage.remaining} left today)` : ''}`}
       </button>
+
+      {generating && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px',
+          background: 'var(--info-light)', borderRadius: 'var(--radius-sm)', color: '#0055CC'
+        }}>
+          <span className="spinner" />
+          <span style={{ fontSize: 13, lineHeight: 1.5 }}>
+            Generating your Kids Yoga sequence… this can take up to a minute. Please stay on this page.
+          </span>
+        </div>
+      )}
 
       {drafts.map((draft, i) => (
         <div key={i} style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>

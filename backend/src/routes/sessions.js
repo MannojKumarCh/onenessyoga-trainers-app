@@ -58,10 +58,12 @@ async function getSequenceTopicByDate(dates) {
 // Full sequence content (instructions, items, sheet link) for a single
 // session's date - only used on the single-session detail route, since list
 // routes only need the lightweight topic string above. Same date-only,
-// irrespective-of-trainer matching as getSequenceTopicByDate.
-async function getSequenceForDate(date) {
+// irrespective-of-trainer matching as getSequenceTopicByDate, unless a
+// trainerId is given (see getSequenceInfoByTrainerDate below for why Kids
+// Yoga sessions need that scoping).
+async function getSequenceForDate(date, trainerId = null) {
   const seq = await prisma.sequence.findFirst({
-    where: { scheduled_date: date },
+    where: trainerId ? { scheduled_date: date, assigned_trainer_id: trainerId } : { scheduled_date: date },
     orderBy: { id: 'asc' },
     include: { items: { orderBy: { sort_order: 'asc' } } }
   });
@@ -76,13 +78,41 @@ async function getSequenceForDate(date) {
   };
 }
 
-// Kids Yoga sessions have their own dedicated content model
-// (KidsYogaLesson) and must never pick up a same-date Sequence meant for a
-// different slot/trainer - the date-only matching above is only valid
-// between regular sessions.
-function serialize(session, topicByDate = new Map()) {
+// Kids Yoga sessions can each carry their own manually-created Sequence
+// (the "Create Manually" alternative to the AI lesson generator) - but
+// several Kids Yoga/regular sessions can share the same calendar date across
+// different trainers, so unlike getSequenceTopicByDate above, matching here
+// is scoped to (trainer, date), never date alone - otherwise one trainer's
+// sequence could bleed into another's session, as it briefly did.
+async function getSequenceInfoByTrainerDate(pairs) {
+  const uniqueDates = [...new Set(pairs.map(p => p.date))];
+  if (uniqueDates.length === 0) return new Map();
+
+  const sequences = await prisma.sequence.findMany({
+    where: { scheduled_date: { in: uniqueDates } },
+    select: { scheduled_date: true, assigned_trainer_id: true, topic: true, status: true, creator: { select: { name: true } } },
+    orderBy: { id: 'asc' }
+  });
+
+  const infoByKey = new Map();
+  for (const seq of sequences) {
+    const key = `${seq.assigned_trainer_id}|${seq.scheduled_date}`;
+    if (!infoByKey.has(key)) {
+      infoByKey.set(key, { topic: seq.topic, status: seq.status, owner_name: seq.creator?.name ?? null });
+    }
+  }
+  return infoByKey;
+}
+
+function seqInfoFor(session, topicByDate, kidsSeqByTrainerDate) {
+  return session.session_type === 'Kids Yoga'
+    ? kidsSeqByTrainerDate.get(`${session.assigned_trainer_id}|${session.scheduled_date}`) ?? null
+    : topicByDate.get(session.scheduled_date);
+}
+
+function serialize(session, topicByDate = new Map(), kidsSeqByTrainerDate = new Map()) {
   const { assigned_trainer, backup_trainer, ...rest } = session;
-  const seqInfo = session.session_type === 'Kids Yoga' ? null : topicByDate.get(session.scheduled_date);
+  const seqInfo = seqInfoFor(session, topicByDate, kidsSeqByTrainerDate);
   return {
     ...rest,
     title: seqInfo?.topic ?? rest.title,
@@ -93,9 +123,15 @@ function serialize(session, topicByDate = new Map()) {
   };
 }
 
-function serializeWithZoom(session, topicByDate = new Map()) {
+function kidsYogaPairs(sessions) {
+  return sessions
+    .filter(s => s.session_type === 'Kids Yoga')
+    .map(s => ({ trainerId: s.assigned_trainer_id, date: s.scheduled_date }));
+}
+
+function serializeWithZoom(session, topicByDate = new Map(), kidsSeqByTrainerDate = new Map()) {
   const { assigned_trainer, backup_trainer, ...rest } = session;
-  const seqInfo = session.session_type === 'Kids Yoga' ? null : topicByDate.get(session.scheduled_date);
+  const seqInfo = seqInfoFor(session, topicByDate, kidsSeqByTrainerDate);
   return {
     ...rest,
     title: seqInfo?.topic ?? rest.title,
@@ -124,9 +160,12 @@ router.get('/my', authenticate, requireRole('trainer', 'kids_yoga_trainer'), asy
     },
     orderBy: [{ scheduled_date: 'asc' }, { scheduled_time: 'asc' }]
   });
-  const topicByDate = await getSequenceTopicByDate(sessions.map(s => s.scheduled_date));
+  const [topicByDate, kidsSeqByTrainerDate] = await Promise.all([
+    getSequenceTopicByDate(sessions.map(s => s.scheduled_date)),
+    getSequenceInfoByTrainerDate(kidsYogaPairs(sessions))
+  ]);
   res.json(sessions.map(s => ({
-    ...serialize(s, topicByDate),
+    ...serialize(s, topicByDate, kidsSeqByTrainerDate),
     viewer_role: s.backup_trainer_id === req.user.id && s.assigned_trainer_id !== req.user.id ? 'backup' : 'assigned'
   })));
 });
@@ -139,8 +178,11 @@ router.get('/completed', authenticate, async (req, res) => {
     orderBy: [{ scheduled_date: 'desc' }, { scheduled_time: 'desc' }],
     take: 100
   });
-  const topicByDate = await getSequenceTopicByDate(sessions.map(s => s.scheduled_date));
-  res.json(sessions.map(s => serialize(s, topicByDate)));
+  const [topicByDate, kidsSeqByTrainerDate] = await Promise.all([
+    getSequenceTopicByDate(sessions.map(s => s.scheduled_date)),
+    getSequenceInfoByTrainerDate(kidsYogaPairs(sessions))
+  ]);
+  res.json(sessions.map(s => serialize(s, topicByDate, kidsSeqByTrainerDate)));
 });
 
 // Admin: all sessions
@@ -159,8 +201,11 @@ router.get('/', authenticate, requireRole('super_admin'), async (req, res) => {
     include: { assigned_trainer: { select: { name: true } }, backup_trainer: { select: { name: true } } },
     orderBy: [{ scheduled_date: 'desc' }, { scheduled_time: 'asc' }]
   });
-  const topicByDate = await getSequenceTopicByDate(sessions.map(s => s.scheduled_date));
-  res.json(sessions.map(s => serialize(s, topicByDate)));
+  const [topicByDate, kidsSeqByTrainerDate] = await Promise.all([
+    getSequenceTopicByDate(sessions.map(s => s.scheduled_date)),
+    getSequenceInfoByTrainerDate(kidsYogaPairs(sessions))
+  ]);
+  res.json(sessions.map(s => serialize(s, topicByDate, kidsSeqByTrainerDate)));
 });
 
 // Get single session
@@ -184,13 +229,18 @@ router.get('/:id', authenticate, async (req, res) => {
   if (isTrainerOnly && !isParty) {
     return res.status(403).json({ error: 'Forbidden' });
   }
-  // Kids Yoga sessions never carry Sequence content - they have their own
-  // dedicated kids_yoga_lesson instead (see serializeWithZoom above).
-  const [topicByDate, sequence] = await Promise.all([
+  // A Kids Yoga session's Sequence (the "Create Manually" alternative to the
+  // AI lesson) is matched to this trainer's own date only - never date-only
+  // like a regular session - so it can never pick up another trainer's
+  // sequence for the same day.
+  const [topicByDate, kidsSeqByTrainerDate, sequence] = await Promise.all([
     getSequenceTopicByDate([session.scheduled_date]),
-    session.session_type === 'Kids Yoga' ? Promise.resolve(null) : getSequenceForDate(session.scheduled_date)
+    getSequenceInfoByTrainerDate(kidsYogaPairs([session])),
+    session.session_type === 'Kids Yoga'
+      ? getSequenceForDate(session.scheduled_date, session.assigned_trainer_id)
+      : getSequenceForDate(session.scheduled_date)
   ]);
-  res.json({ ...serializeWithZoom(session, topicByDate), sequence });
+  res.json({ ...serializeWithZoom(session, topicByDate, kidsSeqByTrainerDate), sequence });
 });
 
 // Admin: create session
