@@ -44,12 +44,18 @@ export default function MySessions() {
             <div key={s.id} className="list-item" style={{ cursor: 'pointer' }} onClick={() => navigate(`/sessions/${s.id}`)}>
               <SessionThumb topic={s.session_type} />
               <div className="list-item-left">
+                {s.sequence_status && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase' }}>
+                    {s.sequence_status}
+                  </span>
+                )}
                 <div className="list-item-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {s.title} {s.viewer_role === 'backup' && <span className="badge badge-info">Backup</span>}
                   {s.session_type === 'Kids Yoga' && !s.kids_yoga_lesson && <span className="badge badge-pending">Needs Lesson</span>}
                 </div>
                 <div className="list-item-sub">
                   {s.scheduled_time} · {s.session_type}
+                  {s.sequence_owner_name && ` · Sequence by ${s.sequence_owner_name}`}
                   {s.viewer_role === 'assigned' && s.backup_trainer_name && ` · Covered by ${s.backup_trainer_name}`}
                 </div>
               </div>

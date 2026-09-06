@@ -33,19 +33,24 @@ function parseOptionalPositiveInt(value, fieldName) {
 // topic as the session title, in place of the generic "Daily Session" -
 // irrespective of which trainer the sequence belongs to. If more than one
 // sequence somehow lands on the same date, the earliest-created one wins.
+// Also carries the sequence's status and the creator's (owner's) name, so
+// list views can show "who owns this sequence and is it ready" without a
+// second click into the session.
 async function getSequenceTopicByDate(dates) {
   const uniqueDates = [...new Set(dates)];
   if (uniqueDates.length === 0) return new Map();
 
   const sequences = await prisma.sequence.findMany({
     where: { scheduled_date: { in: uniqueDates } },
-    select: { scheduled_date: true, topic: true },
+    select: { scheduled_date: true, topic: true, status: true, creator: { select: { name: true } } },
     orderBy: { id: 'asc' }
   });
 
   const topicByDate = new Map();
   for (const seq of sequences) {
-    if (!topicByDate.has(seq.scheduled_date)) topicByDate.set(seq.scheduled_date, seq.topic);
+    if (!topicByDate.has(seq.scheduled_date)) {
+      topicByDate.set(seq.scheduled_date, { topic: seq.topic, status: seq.status, owner_name: seq.creator?.name ?? null });
+    }
   }
   return topicByDate;
 }
@@ -73,23 +78,29 @@ async function getSequenceForDate(date) {
 
 function serialize(session, topicByDate = new Map()) {
   const { assigned_trainer, backup_trainer, ...rest } = session;
+  const seqInfo = topicByDate.get(session.scheduled_date);
   return {
     ...rest,
-    title: topicByDate.get(session.scheduled_date) ?? rest.title,
+    title: seqInfo?.topic ?? rest.title,
     trainer_name: assigned_trainer?.name ?? null,
-    backup_trainer_name: backup_trainer?.name ?? null
+    backup_trainer_name: backup_trainer?.name ?? null,
+    sequence_status: seqInfo?.status ?? null,
+    sequence_owner_name: seqInfo?.owner_name ?? null
   };
 }
 
 function serializeWithZoom(session, topicByDate = new Map()) {
   const { assigned_trainer, backup_trainer, ...rest } = session;
+  const seqInfo = topicByDate.get(session.scheduled_date);
   return {
     ...rest,
-    title: topicByDate.get(session.scheduled_date) ?? rest.title,
+    title: seqInfo?.topic ?? rest.title,
     trainer_name: assigned_trainer?.name ?? null,
     trainer_zoom_link: assigned_trainer?.zoom_link ?? null,
     backup_trainer_name: backup_trainer?.name ?? null,
-    backup_trainer_zoom_link: backup_trainer?.zoom_link ?? null
+    backup_trainer_zoom_link: backup_trainer?.zoom_link ?? null,
+    sequence_status: seqInfo?.status ?? null,
+    sequence_owner_name: seqInfo?.owner_name ?? null
   };
 }
 
