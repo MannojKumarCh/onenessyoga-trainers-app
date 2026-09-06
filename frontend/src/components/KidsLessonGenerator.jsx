@@ -163,7 +163,8 @@ const EMPTY_FORM = {
   specific_yoga_poses: [],
   other_pose: '',
   relaxation_setting: '',
-  cultural_context: ''
+  cultural_context: '',
+  other_cultural_context: ''
 };
 
 // Generates and freezes a Kids Yoga lesson for a specific, already-scheduled
@@ -198,6 +199,10 @@ export default function KidsLessonGenerator({ session, onFrozen }) {
     return [...form.specific_yoga_poses, ...(form.other_pose.trim() ? [form.other_pose.trim()] : [])].join(', ');
   }
 
+  function effectiveCulturalContext() {
+    return form.cultural_context === '__other__' ? form.other_cultural_context.trim() : form.cultural_context;
+  }
+
   async function generate() {
     setError('');
     setGenerating(true);
@@ -209,7 +214,7 @@ export default function KidsLessonGenerator({ session, onFrozen }) {
         target_age_range: form.target_age_range,
         specific_yoga_poses: combinedPoses() || undefined,
         relaxation_setting: form.relaxation_setting,
-        cultural_context: form.cultural_context || undefined
+        cultural_context: effectiveCulturalContext() || undefined
       });
       setDrafts(d => [...d, data]);
       setUsage({ used: data.used, remaining: data.remaining, limit: data.limit });
@@ -231,7 +236,7 @@ export default function KidsLessonGenerator({ session, onFrozen }) {
         target_age_range: form.target_age_range,
         specific_yoga_poses: combinedPoses() || undefined,
         relaxation_setting: form.relaxation_setting,
-        cultural_context: form.cultural_context || undefined,
+        cultural_context: effectiveCulturalContext() || undefined,
         opening: draft.opening,
         warmups: draft.warmups,
         narrative_sequence: draft.narrative_sequence,
@@ -324,7 +329,17 @@ export default function KidsLessonGenerator({ session, onFrozen }) {
         <select id="kids-culture" className="input" value={form.cultural_context} onChange={e => setForm(f => ({ ...f, cultural_context: e.target.value }))}>
           <option value="">None / No specific festival</option>
           {CULTURAL_CONTEXTS.map(c => <option key={c} value={c}>{c}</option>)}
+          <option value="__other__">Other (specify)…</option>
         </select>
+        {form.cultural_context === '__other__' && (
+          <input
+            className="input"
+            style={{ marginTop: 8 }}
+            placeholder="e.g. a specific festival or auspicious day…"
+            value={form.other_cultural_context}
+            onChange={e => setForm(f => ({ ...f, other_cultural_context: e.target.value }))}
+          />
+        )}
       </div>
 
       {error && <p className="error-text" style={{ margin: 0 }}>{error}</p>}
