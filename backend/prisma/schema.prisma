@@ -120,7 +120,7 @@ model KidsYogaLesson {
   target_age_range     String
   specific_yoga_poses  String?
   relaxation_setting   String
-  cultural_context     String
+  cultural_context     String?
   opening_text         String
   warmups_text         String
   narrative_text       String

@@ -80,6 +80,11 @@ function buildPrompt(inputs, avoidSummaries = []) {
     ? specificYogaPoses
     : '(none specified - choose poses that fit the story)';
 
+  // Optional - most days aren't tied to a specific festival.
+  const culturalContextText = culturalContext && culturalContext.trim()
+    ? culturalContext
+    : 'no specific festival or cultural theme - keep it general and fun';
+
   const avoidText = avoidSummaries.length > 0
     ? `\n\nIMPORTANT - AVOID REPETITION:\nThe following stories/themes were used in recent sessions for this same trainer. The new session's story, characters, and specific plot must be meaningfully different from all of them - do not reuse the same narrative even if it fits the inputs below:\n${avoidSummaries.map(s => `- ${s}`).join('\n')}`
     : '';
@@ -110,7 +115,7 @@ Write tight and scannable, not flowing prose - a teacher needs to glance at this
 1. Introduce the session theme with a short, captivating story snippet based on ${primaryTheme} to grab the children's attention immediately.
 2. Develop a series of warm-up movements that introduce the environment or the "journey" the children are about to embark on.
 3. Create the main sequence by linking specific yoga poses to characters, actions, or elements in the story, ensuring a flow that makes sense within the ${narrativeBackground}.
-4. Incorporate interactive sound effects, call-and-response chants, or simple mantras specifically suited for ${culturalContext} to maintain high engagement.
+4. Incorporate interactive sound effects, call-and-response chants, or simple mantras suited for ${culturalContextText} to maintain high engagement.
 5. Conclude with a "Shanti" relaxation period, scripted as a peaceful themed rest (e.g. ${relaxationSetting}) to transition the kids back to a calm state.
 
 Specific yoga poses to include if possible: ${posesText}${avoidText}

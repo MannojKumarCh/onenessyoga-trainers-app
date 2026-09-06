@@ -23,9 +23,10 @@ function httpError(status, message) {
   return err;
 }
 
+// cultural_context is deliberately not required - most days aren't tied to a
+// specific festival, and forcing a choice every time would be noise.
 const REQUIRED_INPUT_FIELDS = [
-  'narrative_background', 'primary_theme', 'target_age_range',
-  'relaxation_setting', 'cultural_context'
+  'narrative_background', 'primary_theme', 'target_age_range', 'relaxation_setting'
 ];
 
 function readInputs(body) {
@@ -40,7 +41,7 @@ function readInputs(body) {
     targetAgeRange: body.target_age_range,
     specificYogaPoses: body.specific_yoga_poses || null,
     relaxationSetting: body.relaxation_setting,
-    culturalContext: body.cultural_context
+    culturalContext: body.cultural_context || null
   };
 }
 
@@ -109,7 +110,7 @@ router.post('/freeze', authenticate, requireRole('kids_yoga_trainer'), async (re
   } = req.body;
 
   for (const [field, value] of Object.entries({
-    narrative_background, primary_theme, target_age_range, relaxation_setting, cultural_context,
+    narrative_background, primary_theme, target_age_range, relaxation_setting,
     opening, warmups, narrative_sequence, closing_shanti, summary
   })) {
     if (!value || !String(value).trim()) throw httpError(400, `${field} is required`);
@@ -157,7 +158,7 @@ router.post('/freeze', authenticate, requireRole('kids_yoga_trainer'), async (re
     target_age_range,
     specific_yoga_poses,
     relaxation_setting,
-    cultural_context,
+    cultural_context: cultural_context || null,
     opening_text: opening,
     warmups_text: warmups,
     narrative_text: narrative_sequence,
@@ -173,7 +174,7 @@ router.post('/freeze', authenticate, requireRole('kids_yoga_trainer'), async (re
       target_age_range,
       specific_yoga_poses,
       relaxation_setting,
-      cultural_context,
+      cultural_context: cultural_context || null,
       opening_text: opening,
       warmups_text: warmups,
       narrative_text: narrative_sequence,

@@ -277,7 +277,7 @@ Narrative Background: ${narrative_background}
 Target Age Range: ${target_age_range}
 Specific Yoga Poses: ${specific_yoga_poses || '(none specified)'}
 Relaxation Setting: ${relaxation_setting}
-Cultural Context: ${cultural_context}
+Cultural Context: ${cultural_context || '(none specified)'}
 
 SUMMARY
 ${summary}

@@ -60,7 +60,7 @@ const RELAXATION_SETTINGS = [
 
 const CULTURAL_CONTEXTS = [
   'Diwali', 'Holi', 'Navratri', 'Onam', 'Pongal', 'Ganesh Chaturthi',
-  'Raksha Bandhan', 'No Specific Festival', 'North Indian Folk Tales', 'South Indian Folk Tales'
+  'Raksha Bandhan', 'North Indian Folk Tales', 'South Indian Folk Tales'
 ];
 
 const PHASES = [
@@ -106,7 +106,7 @@ export default function KidsLessonGenerator({ session, onFrozen }) {
   }
 
   const formComplete = form.narrative_background && form.primary_theme
-    && form.target_age_range && form.relaxation_setting && form.cultural_context;
+    && form.target_age_range && form.relaxation_setting;
 
   function combinedPoses() {
     return [...form.specific_yoga_poses, ...(form.other_pose.trim() ? [form.other_pose.trim()] : [])].join(', ');
@@ -123,7 +123,7 @@ export default function KidsLessonGenerator({ session, onFrozen }) {
         target_age_range: form.target_age_range,
         specific_yoga_poses: combinedPoses() || undefined,
         relaxation_setting: form.relaxation_setting,
-        cultural_context: form.cultural_context
+        cultural_context: form.cultural_context || undefined
       });
       setDrafts(d => [...d, data]);
       setUsage({ used: data.used, remaining: data.remaining, limit: data.limit });
@@ -145,7 +145,7 @@ export default function KidsLessonGenerator({ session, onFrozen }) {
         target_age_range: form.target_age_range,
         specific_yoga_poses: combinedPoses() || undefined,
         relaxation_setting: form.relaxation_setting,
-        cultural_context: form.cultural_context,
+        cultural_context: form.cultural_context || undefined,
         opening: draft.opening,
         warmups: draft.warmups,
         narrative_sequence: draft.narrative_sequence,
@@ -234,9 +234,9 @@ export default function KidsLessonGenerator({ session, onFrozen }) {
       </div>
 
       <div className="form-group" style={{ margin: 0 }}>
-        <label className="label" htmlFor="kids-culture">Cultural Context</label>
+        <label className="label" htmlFor="kids-culture">Cultural Context (Optional)</label>
         <select id="kids-culture" className="input" value={form.cultural_context} onChange={e => setForm(f => ({ ...f, cultural_context: e.target.value }))}>
-          <option value="">Select…</option>
+          <option value="">None / No specific festival</option>
           {CULTURAL_CONTEXTS.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
