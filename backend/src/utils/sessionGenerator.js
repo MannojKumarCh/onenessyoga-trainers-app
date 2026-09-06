@@ -9,11 +9,20 @@ function toIstDateString(date) {
 
 // Ensures the next WINDOW_DAYS days have real Session rows for every active
 // SessionTemplate slot that applies to each date's weekday. Idempotent by
-// construction (skips any date+time pair that already has a session), so
-// it's safe to run repeatedly - on every server startup and once daily.
-// Never updates an existing row, which is what makes a later template edit
-// (e.g. changing a slot's dedicated trainer) apply only to sessions
-// generated after the edit, not retroactively to ones already created.
+// construction (skips any date+time+session_type combination that already
+// has a session), so it's safe to run repeatedly - on every server startup
+// and once daily. The key includes session_type (not just date+time)
+// because two genuinely different classes can share a clock time (e.g. a
+// regular 5 PM class and a Kids Yoga 5 PM class) - keying on date+time alone
+// would make whichever template ran first silently block the other from
+// ever being generated. session_type, not trainer, is the right extra key:
+// it identifies "which class this is" and is unaffected by a later
+// per-session trainer override (assigned_trainer_is_override), so an
+// overridden session still correctly counts as "already generated" and
+// isn't duplicated. Never updates an existing row, which is what makes a
+// later template edit (e.g. changing a slot's dedicated trainer) apply only
+// to sessions generated after the edit, not retroactively to ones already
+// created.
 async function generateUpcomingSessions(now = new Date()) {
   const todayIst = toIstDateString(now);
   const dates = Array.from({ length: WINDOW_DAYS }, (_, i) => {
@@ -27,16 +36,16 @@ async function generateUpcomingSessions(now = new Date()) {
 
   const existing = await prisma.session.findMany({
     where: { scheduled_date: { in: dates } },
-    select: { scheduled_date: true, scheduled_time: true }
+    select: { scheduled_date: true, scheduled_time: true, session_type: true }
   });
-  const existingKeys = new Set(existing.map(s => `${s.scheduled_date}|${s.scheduled_time}`));
+  const existingKeys = new Set(existing.map(s => `${s.scheduled_date}|${s.scheduled_time}|${s.session_type ?? 'BKP'}`));
 
   const toCreate = [];
   for (const date of dates) {
     const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
     for (const t of templates) {
       if (!t.weekdays.includes(dow)) continue;
-      const key = `${date}|${t.scheduled_time}`;
+      const key = `${date}|${t.scheduled_time}|${t.session_type || 'BKP'}`;
       if (existingKeys.has(key)) continue;
       toCreate.push({
         title: t.title,
