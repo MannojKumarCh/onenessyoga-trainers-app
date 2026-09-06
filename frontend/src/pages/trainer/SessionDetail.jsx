@@ -182,6 +182,29 @@ export default function SessionDetail() {
         </div>
       )}
 
+      {session.kids_yoga_lesson && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <p style={{ fontWeight: 700, marginBottom: 4 }}>Kids Yoga Lesson</p>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12, fontStyle: 'italic' }}>{session.kids_yoga_lesson.summary}</p>
+          {[
+            ['Opening (5 mins)', session.kids_yoga_lesson.opening_text],
+            ['Warmups (10 mins)', session.kids_yoga_lesson.warmups_text],
+            ['The Narrative Sequence (20 mins)', session.kids_yoga_lesson.narrative_text],
+            ['Closing / Shanti (5 mins)', session.kids_yoga_lesson.closing_text]
+          ].map(([label, text]) => (
+            <div key={label} style={{ marginBottom: 12 }}>
+              <p style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{label}</p>
+              <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{text}</p>
+            </div>
+          ))}
+          {session.kids_yoga_lesson.drive_file_link && (
+            <a href={session.kids_yoga_lesson.drive_file_link} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: 'var(--primary)' }}>
+              View in Google Drive
+            </a>
+          )}
+        </div>
+      )}
+
       <div className="form-group">
         <label className="label" htmlFor="session-notes">Session Notes</label>
         <textarea

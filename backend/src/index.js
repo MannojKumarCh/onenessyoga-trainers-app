@@ -48,6 +48,7 @@ app.use('/api/leaves', require('./routes/leaves'));
 app.use('/api/sequences', require('./routes/sequences'));
 app.use('/api/resources', require('./routes/resources'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/kids-yoga', require('./routes/kidsYoga'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 

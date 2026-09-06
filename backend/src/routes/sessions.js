@@ -150,7 +150,8 @@ router.get('/:id', authenticate, async (req, res) => {
     where: { id: parseInt(req.params.id) },
     include: {
       assigned_trainer: { select: { name: true, zoom_link: true } },
-      backup_trainer: { select: { name: true, zoom_link: true } }
+      backup_trainer: { select: { name: true, zoom_link: true } },
+      kids_yoga_lesson: true
     }
   });
   if (!session) return res.status(404).json({ error: 'Session not found' });

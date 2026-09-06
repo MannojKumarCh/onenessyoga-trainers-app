@@ -1,5 +1,6 @@
 const prisma = require('../db/db');
 const Anthropic = require('@anthropic-ai/sdk');
+const { getIstDayBoundsUtc } = require('./istDate');
 
 // Each AI feature in this app gets its own model env var (this one is the
 // scheduler's) while all of them share one ANTHROPIC_API_KEY - a future
@@ -9,18 +10,6 @@ const ANTHROPIC_SCHEDULER_MODEL = process.env.ANTHROPIC_SCHEDULER_MODEL || 'clau
 const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
 
 const DAILY_LIMIT = 5;
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000; // IST has no DST, fixed UTC+5:30 offset
-
-// Returns the [start, end) UTC instants corresponding to "today" in IST,
-// regardless of the server's own timezone.
-function getIstDayBoundsUtc(date = new Date()) {
-  const istNow = new Date(date.getTime() + IST_OFFSET_MS);
-  const istMidnightUtcMs = Date.UTC(istNow.getUTCFullYear(), istNow.getUTCMonth(), istNow.getUTCDate()) - IST_OFFSET_MS;
-  return {
-    startOfDayUtc: new Date(istMidnightUtcMs),
-    endOfDayUtc: new Date(istMidnightUtcMs + 24 * 60 * 60 * 1000)
-  };
-}
 
 async function getDailyUsage(userId) {
   const { startOfDayUtc, endOfDayUtc } = getIstDayBoundsUtc();

@@ -15,6 +15,7 @@ import Leaves from './pages/trainer/Leaves';
 import Sequences from './pages/trainer/Sequences';
 import SequenceDetail from './pages/trainer/SequenceDetail';
 import Resources from './pages/trainer/Resources';
+import NewKidsSession from './pages/trainer/NewKidsSession';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminTrainers from './pages/admin/Trainers';
 import AdminSessions from './pages/admin/Sessions';
@@ -42,9 +43,12 @@ const TRAINER_ROUTES = [
 
 const ROUTES_BY_ROLE = {
   trainer: TRAINER_ROUTES,
-  // Kids Yoga Trainer is its own role, but behaves identically to a regular
-  // trainer for now - its distinct features are still to be designed.
-  kids_yoga_trainer: TRAINER_ROUTES,
+  // Kids Yoga Trainer gets every regular trainer page, plus its own
+  // self-service AI session generator.
+  kids_yoga_trainer: [
+    ...TRAINER_ROUTES,
+    { path: 'new-kids-session', element: <NewKidsSession /> }
+  ],
   // No '' entry: a pure Sequence Creator's home falls back to their
   // 'sequences' page (see buildRoutes below), matching the prior behavior
   // where CreatorSequences was both the index and the /sequences page.

@@ -7,6 +7,7 @@ const SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.goo
 // inside a folder owned by a real account (shared with the service account as Editor),
 // otherwise Google rejects file creation with a generic 403 "forbidden".
 const SEQUENCES_FOLDER_ID = process.env.GOOGLE_SEQUENCES_FOLDER_ID;
+const KIDS_YOGA_FOLDER_ID = process.env.GOOGLE_KIDS_YOGA_FOLDER_ID;
 
 function buildClient() {
   try {
@@ -249,4 +250,67 @@ async function shareSpreadsheetWithTrainer(spreadsheetId, email) {
   }
 }
 
-module.exports = { upsertSequenceInSheet, shareSpreadsheetWithTrainer };
+// Uploads one frozen Kids Yoga lesson as a plain-text file to Drive - reuses
+// the same domain-wide-delegation service-account client as the sequence
+// spreadsheets above (impersonates OWNER_EMAIL, so the file is already owned
+// by a real account with real storage quota). Best-effort: if the Google
+// client isn't configured, or the upload itself fails, this returns null and
+// logs rather than throwing - freezing a lesson must still succeed even if
+// the Drive export doesn't (same convention as shareSpreadsheetWithTrainer).
+async function uploadKidsYogaLessonFile(lesson) {
+  if (!sheetsClient) {
+    console.warn('GOOGLE_SERVICE_ACCOUNT_KEY not configured — skipping Kids Yoga Drive export');
+    return null;
+  }
+
+  const {
+    scheduled_date, primary_theme, narrative_background, target_age_range,
+    specific_yoga_poses, relaxation_setting, cultural_context,
+    opening_text, warmups_text, narrative_text, closing_text, summary
+  } = lesson;
+
+  const title = `Kids Yoga - ${scheduled_date} - ${primary_theme}`;
+  const body = `KIDS YOGA SESSION
+Date: ${scheduled_date}
+Primary Theme: ${primary_theme}
+Narrative Background: ${narrative_background}
+Target Age Range: ${target_age_range}
+Specific Yoga Poses: ${specific_yoga_poses || '(none specified)'}
+Relaxation Setting: ${relaxation_setting}
+Cultural Context: ${cultural_context}
+
+SUMMARY
+${summary}
+
+OPENING (5 mins)
+${opening_text}
+
+WARMUPS (10 mins)
+${warmups_text}
+
+THE NARRATIVE SEQUENCE (20 mins)
+${narrative_text}
+
+CLOSING / SHANTI (5 mins)
+${closing_text}
+`;
+
+  try {
+    const createResp = await sheetsClient.drive.files.create({
+      requestBody: {
+        name: title,
+        mimeType: 'text/plain',
+        ...(KIDS_YOGA_FOLDER_ID ? { parents: [KIDS_YOGA_FOLDER_ID] } : {})
+      },
+      media: { mimeType: 'text/plain', body },
+      fields: 'id, webViewLink',
+      supportsAllDrives: true
+    });
+    return { id: createResp.data.id, webViewLink: createResp.data.webViewLink };
+  } catch (err) {
+    console.error('Failed to upload Kids Yoga lesson to Drive:', err);
+    return null;
+  }
+}
+
+module.exports = { upsertSequenceInSheet, shareSpreadsheetWithTrainer, uploadKidsYogaLessonFile };
