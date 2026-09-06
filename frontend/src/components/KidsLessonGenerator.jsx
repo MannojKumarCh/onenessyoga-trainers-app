@@ -12,40 +12,126 @@ const NARRATIVE_THEMES = {
     "Krishna's Playful Adventures",
     "Ganesha's Great Race",
     'The Churning of the Ocean',
-    "Rama's Forest Adventure"
+    "Rama's Forest Adventure",
+    "Durga's Battle Against Mahishasura"
   ],
   Nature: [
     'The Magical Garden',
     'Journey Through the Seasons',
     'The Whispering Trees',
-    'Sun, Moon & Stars Adventure'
+    'Sun, Moon & Stars Adventure',
+    "The River's Long Journey",
+    'Rainbow After the Rain'
   ],
   Animals: [
     'A Day at the Jungle Safari',
     "The Peacock's Dance",
     'Elephant March to the River',
-    'Monkey Business in the Treetops'
+    'Monkey Business in the Treetops',
+    'The Tortoise and the Hare Race',
+    'Lion King of the Jungle'
   ],
   Forest: [
     'Lost in the Enchanted Forest',
     'The Secret of the Banyan Tree',
-    'Forest Friends Rescue Mission'
+    'Forest Friends Rescue Mission',
+    'The Talking Trees of the Jungle',
+    'Fireflies in the Moonlit Woods',
+    "The Wise Old Owl's Lesson"
   ],
   'School Life': [
     'A Day at the Indian Mela',
     'The Great Playground Adventure',
-    'Recess Time Yoga Games'
+    'Recess Time Yoga Games',
+    'The School Sports Day Challenge',
+    'Show and Tell Adventure',
+    'The Class Picnic Surprise'
   ],
   'Games/Adventure': [
     'Treasure Hunt Adventure',
     'The Obstacle Course Challenge',
-    'Superhero Training Camp'
+    'The Relay Race Challenge',
+    'The Great Kite Festival Race',
+    'Hide and Seek in the Kingdom',
+    'The Puzzle Palace Mystery'
+  ],
+  'Ocean & Underwater': [
+    "The Little Fish's Big Journey",
+    'Diving with Dolphins',
+    "The Mermaid's Coral Kingdom",
+    'Treasure of the Sunken Ship',
+    "The Octopus's Eight Adventures",
+    "Turtle's Race to the Shore"
+  ],
+  'Space & Galaxy': [
+    'Rocket Ride to the Moon',
+    'Dancing Among the Stars',
+    "The Friendly Alien's Visit",
+    'Racing Past the Planets',
+    'The Sun and Its Sleepy Planets',
+    'Astronaut Training Academy'
+  ],
+  'Village Life': [
+    'A Day at the Village Fair',
+    'Helping on the Farm',
+    "The Potter's Wheel Adventure",
+    'Market Day Adventure',
+    'Wishes at the Village Well',
+    'Harvest Festival Fun'
+  ],
+  Superheroes: [
+    'Superhero Training Camp',
+    'Saving the City with Yoga Powers',
+    "The Flying Hero's Mission",
+    'Super Strength Squad',
+    "The Invisible Hero's Challenge",
+    'Team of Super Kids'
+  ],
+  'Fairy Tales': [
+    "The Sleeping Princess's Garden",
+    'Jack and the Magic Beanstalk',
+    "The Three Little Pigs' Houses",
+    "Cinderella's Midnight Adventure",
+    "The Frog Prince's Pond",
+    'Goldilocks and the Three Bears'
+  ],
+  'Farm Life': [
+    'A Morning on the Farm',
+    'The Cow and the Milkmaid',
+    'Chasing Chickens in the Yard',
+    "The Scarecrow's Secret",
+    'Horse Gallop Adventure',
+    "The Farmer's Big Harvest"
+  ],
+  'Circus & Carnival': [
+    'Under the Big Top',
+    "The Tightrope Walker's Balance",
+    'Juggling with the Clowns',
+    "The Lion Tamer's Courage",
+    'Trapeze Flying Adventure',
+    'The Carnival Parade'
+  ],
+  'Pirates & Treasure Hunt': [
+    'Sailing the Seven Seas',
+    'The Map to Hidden Treasure',
+    'Pirate Ship Balancing Act',
+    'Island of the Lost Gold',
+    "The Captain's Brave Crew",
+    'Battling the Sea Storm'
+  ],
+  'Music & Dance': [
+    'The Rhythm of the Dhol',
+    "Dancing Peacock's Melody",
+    "The Magic Flute's Journey",
+    'Bollywood Dance Adventure',
+    'The Singing Birds of the Forest',
+    'Drumbeats of the Jungle'
   ]
 };
 
 const NARRATIVE_BACKGROUNDS = Object.keys(NARRATIVE_THEMES);
 
-const AGE_RANGES = ['3-5 years', '5-8 years', '8-10 years', '10-12 years'];
+const AGE_RANGES = ['3-5 years', '6-10 years', '11-13 years'];
 
 const YOGA_POSES = [
   'Tree Pose', 'Cobra Pose', 'Cat-Cow', 'Butterfly Pose', 'Downward Dog',
