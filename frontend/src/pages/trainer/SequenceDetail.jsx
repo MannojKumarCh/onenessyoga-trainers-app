@@ -12,7 +12,7 @@ import { getSessionImageUrl } from '../../config/sessionImages';
 import SequenceItemsView from '../../components/SequenceItemsView';
 
 const EMPTY_ITEM = { name: '', remarks: '', reference_url: '', is_heading: false };
-const AUTOSAVE_DELAY_MS = 1500;
+const AUTOSAVE_DELAY_MS = 3000;
 
 // Resizes/compresses a pasted or picked image before it's stored as a data:
 // URL (reused as-is by SequenceItemsView/the Sheet export) - keeps the DB
