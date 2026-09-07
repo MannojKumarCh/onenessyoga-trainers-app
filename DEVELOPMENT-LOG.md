@@ -658,6 +658,36 @@ Deployed to dev (`tdev.onenessyoga.in`) - migration applied, `GOOGLE_KIDS_YOGA_F
 
 Deployed to prod (`trainers.onenessyoga.in`) the same day - both migrations backed-up-then-applied, `GOOGLE_KIDS_YOGA_FOLDER_ID` set (reusing the same Drive folder as dev, per explicit decision - real trainer content isn't separated from dev's test files), backend restarted cleanly. No live Anthropic call made on prod during deployment. The user will assign the `kids_yoga_trainer` role to their real trainer's existing account via the admin Trainers screen, and set up that trainer's recurring Mon-Fri 5 PM Weekly Schedule slot themselves via the existing Weekly Schedule feature - no code or data changes needed for either.
 
+## 37. Sequence owner/status on My Sessions, a Kids Yoga content-bleed bug, and a manual-Sequence alternative to the AI lesson (2026-09-06/07)
+
+After the user assigned the `kids_yoga_trainer` role and added the Weekly Schedule slot themselves (per §36's follow-up), two real bugs surfaced and one new requirement came in.
+
+**My Sessions: show sequence owner + status per row** - `getSequenceTopicByDate` (in `backend/src/routes/sessions.js`) now also returns each date's sequence `status` and creator name, exposed as `sequence_status`/`sequence_owner_name` on every serialized session. `MySessions.jsx` shows the status as an uppercase label (matching the existing Sequences list) and appends "Sequence by `<name>`" to the sub-line - a trainer can now tell a sequence's state before opening the session.
+
+**Bug: a Kids Yoga session showed a *different* trainer's regular Sequence** - the first symptom was actually two chained issues:
+1. A newly-added Kids Yoga Weekly Schedule slot generated **zero** sessions, because the daily generator had already run earlier that day before the slot existed and wouldn't run again until the next 00:15 IST tick - fixed by triggering `generateUpcomingSessions()` manually once (idempotent, safe to re-run).
+2. Once sessions existed, the Kids Yoga session at 5 PM showed the *regular* trainer's Sequence content for that same date - `getSequenceForDate`/`getSequenceTopicByDate` have always matched by date only, irrespective of trainer, which was safe back when only one trainer ever had a session at a given time. That assumption broke the moment Kids Yoga shared a date with a regular Sequence-driven session. Fixed narrowly by making Kids Yoga sessions skip that lookup entirely (`serialize()`/`serializeWithZoom()`/`GET /:id` all special-case `session_type === 'Kids Yoga'`) - regular sessions' date-only matching is untouched.
+
+**New requirement: two ways to fill in a Kids Yoga session's content, not just AI** - "Generate with AI" (unchanged) or "Create Manually", which builds a real `Sequence` - the same model, same build/upload/notify-team flow every regular trainer already uses, so almost no new backend code was needed:
+- The blanket "Kids Yoga never shows Sequence content" fix above was replaced with a **trainer+date scoped** lookup (`getSequenceInfoByTrainerDate`, keyed `trainerId|date`) - precise enough that one trainer's Kids Yoga sequence can never bleed into another's session on the same date, without reintroducing the bug just fixed.
+- New `POST /sequences/kids-yoga` (`kids_yoga_trainer` only) self-creates the `Sequence` container for the caller's own session (topic only, no Sequence Creator involved) - item content is then built via the *existing* `POST /:id/build`, unchanged. Blocks a second sequence for the same trainer/date (409) and blocks it entirely if an AI lesson already exists for that session (409).
+- New `frontend/src/components/KidsSequenceChoice.jsx`: shown only while a Kids Yoga session has neither an AI lesson nor a sequence yet. "Generate with AI" renders the existing `KidsLessonGenerator`; "Create Manually" is a one-field topic form that creates the sequence then navigates to the standard `SequenceDetail` build page.
+- `KidsLessonGenerator` also got a proper loading state for the AI path (a spinner + "this can take up to a minute" banner, whole form disabled while generating) so the trainer isn't left wondering if anything is happening during the ~10-30s Claude call.
+
+Verified end-to-end on dev without spending any AI credits (the manual path never calls Claude): create → build items → auto-synced to the Google Sheet → shown correctly on that one session only, a different date on the same trainer left untouched, double-create blocked, blocked when an AI lesson already exists. Deployed to prod the same way (no live Anthropic call during deployment either).
+
+## 38. Sequence builder: autosave, sub-headings, pasted images, insert-row-above (2026-09-07)
+
+Four improvements to the "Build Sequence" modal (`SequenceDetail.jsx`), used by every trainer (regular and Kids Yoga's manual path alike):
+
+- **Autosave**: 3 seconds (tuned up from an initial 1.5s) after the trainer stops editing, the modal silently calls the same `POST /:id/build` the manual "Save Sequence" button already used - which already re-syncs the Google Sheet on every call, so no new endpoint was needed. A ref-tracked snapshot skips firing a no-op save right after opening the modal. Shows "Saving…"/"Saved to Sheet ✓" next to the row controls instead of a toast.
+- **Sub-headings**: new `SequenceItem.is_heading` column (migration `20260907000000_sequence_item_headings`). Any row can be toggled into a heading via a small "H" button (single full-width text cell, no remarks/reference), or added directly via "+ Sub-heading". Heading rows write to the Sheet as a label-only row (no cell formatting/bolding attempted there - plain text is enough for a reference copy).
+- **Pasted images in the Reference column**: paste from the clipboard or pick a file; resized/compressed client-side (canvas, `maxDim 800px`, JPEG q0.7) into a `data:` URL - no new storage or dependency, since `reference_url` was already an unbounded `TEXT` column. Shown as a 36-64px thumbnail; clicking it opens a full-size lightbox. The Sheet export substitutes a `[Image - view in app]` placeholder instead of dumping raw base64 (would blow past Sheets' per-cell size limit and isn't useful there anyway).
+- **Insert row above**: an up-arrow button per row inserts a blank row directly above it, instead of only being able to append at the end.
+- Extracted the read-only item list (used by both `SessionDetail.jsx` and `SequenceDetail.jsx`, previously duplicated) into a shared `frontend/src/components/SequenceItemsView.jsx`, so heading rendering and the image lightbox exist in exactly one place.
+
+Backend-verified on dev (heading + non-heading rows persist and round-trip correctly, Sheet sync confirmed). Migration backed-up-then-applied on both dev and prod the same day; no schema change needed for the follow-up 1.5s→3s autosave-delay tweak (frontend constant only).
+
 ---
 
 ## Dev environment data reset (2026-08-20)
