@@ -355,8 +355,9 @@ router.post('/:id/build', authenticate, requireRole('trainer', 'kids_yoga_traine
         sequence_id: id,
         sort_order: i,
         name: it.name.trim(),
-        remarks: it.remarks || null,
-        reference_url: it.reference_url || null
+        is_heading: !!it.is_heading,
+        remarks: it.is_heading ? null : (it.remarks || null),
+        reference_url: it.is_heading ? null : (it.reference_url || null)
       }))
     })
   ]);

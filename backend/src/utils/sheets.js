@@ -187,7 +187,16 @@ async function rewriteDayTabContent(spreadsheetId, tabTitle, scheduled_date) {
     const trainerName = seq.assigned_trainer?.name || '';
     rows.push([`${trainerName} - ${seq.topic}`, '', '']);
     for (const it of seq.items) {
-      rows.push([it.name, it.remarks || '', it.reference_url || '']);
+      if (it.is_heading) {
+        rows.push([it.name, '', '']);
+        continue;
+      }
+      // Pasted images are stored as data: URLs for in-app display - dumping
+      // that raw base64 into a Sheet cell is both unusable and can exceed
+      // Google's per-cell size limit, so the Sheet just gets a placeholder.
+      // ponytail: no cell formatting (bold headings etc.) in the Sheet itself - plain text is enough for a reference copy.
+      const ref = it.reference_url?.startsWith('data:') ? '[Image - view in app]' : (it.reference_url || '');
+      rows.push([it.name, it.remarks || '', ref]);
     }
     rows.push(['', '', '']); // spacer between trainer sections
   }

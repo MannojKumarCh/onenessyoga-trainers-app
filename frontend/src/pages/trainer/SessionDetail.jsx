@@ -10,14 +10,7 @@ import { useToast } from '../../context/ToastContext';
 import { getSessionImageUrl } from '../../config/sessionImages';
 import { useAuth } from '../../context/AuthContext';
 import KidsSequenceChoice from '../../components/KidsSequenceChoice';
-
-function isLikelyUrl(value) {
-  return /^https?:\/\//i.test(value.trim());
-}
-
-function truncateUrl(value, max = 40) {
-  return value.length > max ? `${value.slice(0, max)}…` : value;
-}
+import SequenceItemsView from '../../components/SequenceItemsView';
 
 export default function SessionDetail() {
   const { id } = useParams();
@@ -141,37 +134,7 @@ export default function SessionDetail() {
       {session.sequence?.items?.length > 0 && (
         <div className="card" style={{ marginBottom: 16 }}>
           <p style={{ fontWeight: 700, marginBottom: 12 }}>Sequence Content</p>
-          {session.sequence.items.map((item, i) => (
-            <div
-              key={item.id}
-              style={{
-                padding: '10px 0',
-                borderBottom: i < session.sequence.items.length - 1 ? '1px solid var(--border)' : 'none'
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{i + 1}. {item.name}</div>
-              {item.remarks && (
-                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>{item.remarks}</div>
-              )}
-              {item.reference_url && (
-                isLikelyUrl(item.reference_url) ? (
-                  <a
-                    href={item.reference_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={item.reference_url}
-                    style={{ fontSize: 12, wordBreak: 'break-all', display: 'inline-block', marginTop: 2 }}
-                  >
-                    {truncateUrl(item.reference_url)}
-                  </a>
-                ) : (
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', wordBreak: 'break-word', marginTop: 2 }}>
-                    Reference: {item.reference_url}
-                  </div>
-                )
-              )}
-            </div>
-          ))}
+          <SequenceItemsView items={session.sequence.items} />
         </div>
       )}
 
