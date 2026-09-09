@@ -5,6 +5,7 @@ import { dayLabel, groupByDate } from '../../utils/date';
 import { ExclamationTriangleIcon, CalendarDaysIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import SessionThumb from '../../components/SessionThumb';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 
 export default function MySessions() {
@@ -15,11 +16,12 @@ export default function MySessions() {
   const [error, setError] = useState(false);
 
   const load = useCallback(() => {
-    client.get('/sessions/my').then(r => setSessions(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
+    return client.get('/sessions/my').then(r => setSessions(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
   usePolling(load, 30000);
+  useRegisterPullRefresh(load);
 
   const grouped = groupByDate(sessions);
 

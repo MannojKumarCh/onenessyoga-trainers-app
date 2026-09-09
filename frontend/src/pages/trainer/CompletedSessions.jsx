@@ -5,6 +5,7 @@ import { groupByDate } from '../../utils/date';
 import { ExclamationTriangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import SessionThumb from '../../components/SessionThumb';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 
 export default function CompletedSessions() {
@@ -14,11 +15,12 @@ export default function CompletedSessions() {
   const [error, setError] = useState(false);
 
   const load = useCallback(() => {
-    client.get('/sessions/completed').then(r => setSessions(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
+    return client.get('/sessions/completed').then(r => setSessions(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
   usePolling(load, 30000);
+  useRegisterPullRefresh(load);
 
   const grouped = groupByDate(sessions);
 

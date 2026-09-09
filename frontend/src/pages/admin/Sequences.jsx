@@ -10,6 +10,7 @@ import TopicSelect from '../../components/TopicSelect';
 import SequenceFilters from '../../components/SequenceFilters';
 import SessionThumb from '../../components/SessionThumb';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 
 export default function AdminSequences() {
@@ -49,7 +50,7 @@ export default function AdminSequences() {
     } else if (selectedWeek) {
       params.set('week', selectedWeek);
     }
-    client.get(`/sequences?${params.toString()}`).then(r => setSequences(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
+    return client.get(`/sequences?${params.toString()}`).then(r => setSequences(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }, [selectedWeek, filters, filtersActive]);
 
   useEffect(() => {
@@ -63,6 +64,7 @@ export default function AdminSequences() {
 
   useEffect(() => { if (!filtersActive && !selectedWeek) return; load(); }, [selectedWeek, filtersActive, load]);
   usePolling(() => load(true), 30000);
+  useRegisterPullRefresh(useCallback(() => load(true), [load]));
 
   async function submit(e) {
     e.preventDefault();

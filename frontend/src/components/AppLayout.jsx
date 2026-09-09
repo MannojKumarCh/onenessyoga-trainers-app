@@ -6,11 +6,13 @@ import InstallAppButton from './InstallAppButton';
 import { buildNav } from '../config/nav';
 import { formatRole } from '../utils/formatRole';
 import { ArrowRightStartOnRectangleIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import { usePullToRefreshGesture, PULL_THRESHOLD } from '../hooks/usePullToRefresh';
 
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const nav = buildNav(user.roles);
   const roleLabel = user.roles.map(formatRole).join(' + ');
+  const { containerRef, pullDistance, refreshing } = usePullToRefreshGesture();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -32,7 +34,23 @@ export default function AppLayout() {
         </div>
       </div>
       <PushNotificationsPrompt />
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div ref={containerRef} style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        {(pullDistance > 0 || refreshing) && (
+          <div
+            style={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: 50, zIndex: 5,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
+              transform: `translateY(${refreshing ? 6 : pullDistance - 40}px)`,
+              opacity: refreshing ? 1 : Math.min(pullDistance / PULL_THRESHOLD, 1),
+              transition: refreshing ? 'transform 0.15s ease-out' : 'none'
+            }}
+          >
+            <span
+              className="spinner"
+              style={!refreshing ? { animation: 'none', transform: `rotate(${pullDistance * 3}deg)` } : undefined}
+            />
+          </div>
+        )}
         <Outlet />
       </div>
       {nav.length > 0 && (

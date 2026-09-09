@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import client from '../../api/client';
 import { format } from 'date-fns';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 import { usePush } from '../../hooks/usePush';
 import { useAuth } from '../../context/AuthContext';
@@ -34,7 +35,7 @@ export default function AdminDashboard() {
   const todayStr = new Date().toISOString().split('T')[0];
 
   const load = useCallback(() => {
-    Promise.all([
+    return Promise.all([
       client.get('/users'),
       client.get('/leaves?status=pending'),
       client.get(`/sessions?from=${todayStr}&to=${todayStr}`),
@@ -56,6 +57,7 @@ export default function AdminDashboard() {
   }, [load]);
 
   usePolling(load, 30000);
+  useRegisterPullRefresh(load);
 
 
 

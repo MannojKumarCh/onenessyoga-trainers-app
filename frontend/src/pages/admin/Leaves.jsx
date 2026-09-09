@@ -3,6 +3,7 @@ import client from '../../api/client';
 import Modal from '../../components/Modal';
 import { ExclamationTriangleIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 import { getApiErrorMessage } from '../../utils/apiError';
 
@@ -22,11 +23,12 @@ export default function AdminLeaves() {
     if (!silent) setLoading(true);
     setError(false);
     const q = filter ? `?status=${filter}` : '';
-    client.get(`/leaves${q}`).then(r => setLeaves(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
+    return client.get(`/leaves${q}`).then(r => setLeaves(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
   usePolling(() => load(true), 30000);
+  useRegisterPullRefresh(useCallback(() => load(true), [load]));
 
   async function review(status) {
     setReviewError('');

@@ -7,6 +7,7 @@ import Modal from '../../components/Modal';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, ArrowLeftIcon, PlusIcon, XMarkIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 import { getSessionImageUrl } from '../../config/sessionImages';
 import SequenceItemsView from '../../components/SequenceItemsView';
@@ -76,13 +77,14 @@ export default function SequenceDetail() {
   const builderSnapshotRef = useRef(''); // last-loaded/saved items, to skip a no-op autosave right after opening
 
   const load = useCallback(() => {
-    client.get(`/sequences/${id}`).then(r => {
+    return client.get(`/sequences/${id}`).then(r => {
       setSeq(r.data);
       setLink(r.data.google_sheet_link || '');
     }).catch(() => setLoadError(true));
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  useRegisterPullRefresh(load);
   usePolling(load, 30000);
 
   function openUpload() {

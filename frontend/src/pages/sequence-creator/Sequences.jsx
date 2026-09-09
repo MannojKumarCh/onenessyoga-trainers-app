@@ -10,6 +10,7 @@ import SequenceFilters from '../../components/SequenceFilters';
 import SessionThumb from '../../components/SessionThumb';
 import { getApiErrorMessage } from '../../utils/apiError';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 
 export default function CreatorSequences() {
@@ -61,7 +62,7 @@ export default function CreatorSequences() {
     } else if (selectedWeek) {
       params.set('week', selectedWeek);
     }
-    client.get(`/sequences?${params.toString()}`).then(r => setSequences(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
+    return client.get(`/sequences?${params.toString()}`).then(r => setSequences(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }, [selectedWeek, filters, filtersActive]);
 
   useEffect(() => {
@@ -78,6 +79,7 @@ export default function CreatorSequences() {
   useEffect(() => { if (!filtersActive && !selectedWeek) return; load(); }, [selectedWeek, filtersActive, load]);
 
   usePolling(() => load(true), 30000);
+  useRegisterPullRefresh(useCallback(() => load(true), [load]));
 
   function openAdd() {
     setEditingId(null);

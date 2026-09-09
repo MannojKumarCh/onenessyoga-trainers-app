@@ -6,6 +6,7 @@ import { ExclamationTriangleIcon, QueueListIcon, ChevronRightIcon } from '@heroi
 import SequenceFilters from '../../components/SequenceFilters';
 import SessionThumb from '../../components/SessionThumb';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 
 export default function Sequences() {
@@ -42,11 +43,12 @@ export default function Sequences() {
     } else {
       params.set('week', selectedWeek);
     }
-    client.get(`/sequences?${params.toString()}`).then(r => setSequences(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
+    return client.get(`/sequences?${params.toString()}`).then(r => setSequences(r.data)).catch(() => setError(true)).finally(() => setLoading(false));
   }, [selectedWeek, filters, filtersActive]);
 
   useEffect(() => { load(); }, [load]);
   usePolling(() => load(true), 30000);
+  useRegisterPullRefresh(useCallback(() => load(true), [load]));
 
   return (
     <div className="page">

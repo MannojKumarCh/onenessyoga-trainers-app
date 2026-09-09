@@ -6,6 +6,7 @@ import Modal from '../../components/Modal';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, ArrowLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 import { getSessionImageUrl } from '../../config/sessionImages';
 import { useAuth } from '../../context/AuthContext';
@@ -26,13 +27,14 @@ export default function SessionDetail() {
   const [error, setError] = useState('');
 
   const load = useCallback(() => {
-    client.get(`/sessions/${id}`).then(r => {
+    return client.get(`/sessions/${id}`).then(r => {
       setSession(r.data);
       setNotes(r.data.notes || '');
     }).catch(() => setLoadError(true));
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  useRegisterPullRefresh(load);
   usePolling(load, 30000);
 
   async function saveNotes() {

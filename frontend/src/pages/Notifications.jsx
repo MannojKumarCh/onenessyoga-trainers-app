@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { ExclamationTriangleIcon, BellIcon } from '@heroicons/react/24/outline';
 import client from '../api/client';
 import usePolling from '../hooks/usePolling';
+import { useRegisterPullRefresh } from '../hooks/usePullToRefresh';
 import { useToast } from '../context/ToastContext';
 import { getApiErrorMessage } from '../utils/apiError';
 
@@ -17,11 +18,12 @@ export default function Notifications() {
   const load = useCallback((silent = false) => {
     if (!silent) setLoading(true);
     setLoadError(false);
-    client.get('/notifications/history').then(r => setNotifications(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
+    return client.get('/notifications/history').then(r => setNotifications(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
   usePolling(() => load(true), 30000);
+  useRegisterPullRefresh(useCallback(() => load(true), [load]));
 
   async function handleClick(item) {
     if (!item.is_read) {

@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { dayLabel } from '../../utils/date';
 import { ExclamationTriangleIcon, SparklesIcon, CalendarDaysIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import SessionThumb from '../../components/SessionThumb';
 
 import { usePush } from '../../hooks/usePush';
@@ -22,7 +23,7 @@ export default function Dashboard() {
   const [error, setError] = useState(false);
 
   const load = useCallback(() => {
-    Promise.all([
+    return Promise.all([
       client.get('/sessions/my'),
       client.get('/leaves/my'),
       client.get('/sequences')
@@ -37,6 +38,7 @@ export default function Dashboard() {
 
   useEffect(() => { load(); }, [load]);
   usePolling(load, 30000);
+  useRegisterPullRefresh(load);
 
   if (loading) return <div className="loading">Loading…</div>;
   if (error) return (

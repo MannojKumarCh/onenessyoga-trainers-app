@@ -4,6 +4,7 @@ import TopicSelect from './TopicSelect';
 import ConfirmDialog from './ConfirmDialog';
 import { getApiErrorMessage } from '../utils/apiError';
 import { useToast } from '../context/ToastContext';
+import { useRegisterPullRefresh } from '../hooks/usePullToRefresh';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -274,10 +275,11 @@ export default function WeeklySchedule({ trainers }) {
   const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(() => {
-    client.get('/session-templates').then(r => setTemplates(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
+    return client.get('/session-templates').then(r => setTemplates(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useRegisterPullRefresh(load);
 
   if (loading) return <div className="loading">Loading…</div>;
   if (loadError) return <p className="error-text">Couldn't load the weekly schedule. Please try again.</p>;

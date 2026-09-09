@@ -5,6 +5,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, FolderIcon, LinkIcon, ChevronRightIcon, PlusIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 
 export default function AdminResources() {
@@ -31,10 +32,11 @@ export default function AdminResources() {
 
   const pollLoad = useCallback(() => {
     const q = folderId ? `?parent_id=${folderId}` : '';
-    client.get(`/resources${q}`).then(r => setData(r.data));
+    return client.get(`/resources${q}`).then(r => setData(r.data));
   }, [folderId]);
 
   usePolling(pollLoad, 30000);
+  useRegisterPullRefresh(pollLoad);
 
   async function submit(e) {
     e.preventDefault();

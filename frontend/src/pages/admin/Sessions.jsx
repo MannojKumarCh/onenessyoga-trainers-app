@@ -11,6 +11,7 @@ import MySessions from '../trainer/MySessions';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, CalendarDaysIcon, PlusIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -48,7 +49,7 @@ export default function AdminSessions() {
   const load = useCallback((silent = false) => {
     if (!silent) setLoading(true);
     setLoadError(false);
-    Promise.all([
+    return Promise.all([
       client.get(`/sessions?from=${dateFrom}`),
       client.get('/users/trainers')
     ]).then(([s, t]) => {
@@ -60,6 +61,12 @@ export default function AdminSessions() {
   useEffect(() => { load(); }, [load]);
 
   usePolling(() => load(true), 30000);
+  // Only owns the pull-to-refresh gesture on the "Sessions" tab - passing
+  // null while on the other tabs lets whichever component they render
+  // (WeeklySchedule/MySessions) register its own instead, without this
+  // effect re-firing and clobbering it (see usePullToRefresh.js).
+  const refresh = useCallback(() => load(true), [load]);
+  useRegisterPullRefresh(tab === 'sessions' ? refresh : null);
 
   async function submit(e) {
     e.preventDefault();

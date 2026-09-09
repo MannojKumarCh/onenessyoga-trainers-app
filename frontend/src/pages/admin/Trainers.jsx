@@ -8,6 +8,7 @@ import { getApiErrorMessage } from '../../utils/apiError';
 import { formatRole } from '../../utils/formatRole';
 import { ExclamationTriangleIcon, PlusIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 
 const ROLE_OPTIONS = ['trainer', 'kids_yoga_trainer', 'sequence_creator', 'super_admin'];
@@ -36,15 +37,16 @@ export default function AdminTrainers() {
   const { showToast } = useToast();
 
   const load = useCallback(() => {
-    Promise.all([client.get('/users'), client.get('/session-templates')])
+    return Promise.all([client.get('/users'), client.get('/session-templates')])
       .then(([u, t]) => { setUsers(u.data); setTemplates(t.data); })
       .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
-  
+
   usePolling(load, 30000);
+  useRegisterPullRefresh(load);
 
   function openAdd() { setEditing(null); setForm(EMPTY); setDefaultSlotIds([]); setError(''); setShowForm(true); }
   function openEdit(u) {

@@ -4,6 +4,7 @@ import Modal from '../../components/Modal';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { ExclamationTriangleIcon, DocumentTextIcon, PlusIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 
 export default function Leaves() {
@@ -18,11 +19,12 @@ export default function Leaves() {
   const { showToast } = useToast();
 
   const load = useCallback(() => {
-    client.get('/leaves/my').then(r => setLeaves(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
+    return client.get('/leaves/my').then(r => setLeaves(r.data)).catch(() => setLoadError(true)).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => { load(); }, [load]);
   usePolling(load, 30000);
+  useRegisterPullRefresh(load);
 
   async function submit(e) {
     e.preventDefault();

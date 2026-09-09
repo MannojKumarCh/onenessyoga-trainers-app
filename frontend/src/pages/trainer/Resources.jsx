@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import client from '../../api/client';
 import { ExclamationTriangleIcon, BookOpenIcon, FolderIcon, LinkIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
+import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
 
 export default function Resources() {
@@ -21,10 +22,11 @@ export default function Resources() {
   useEffect(() => { load(folderId); }, [folderId, load]);
 
   const pollLoad = useCallback(() => {
-    client.get(`/resources${folderId ? `?parent_id=${folderId}` : ''}`).then(r => setData(r.data));
+    return client.get(`/resources${folderId ? `?parent_id=${folderId}` : ''}`).then(r => setData(r.data));
   }, [folderId]);
 
   usePolling(pollLoad, 30000);
+  useRegisterPullRefresh(pollLoad);
 
   function openFolder(id) { setFolderId(id); }
   function goBack(id) { setFolderId(id || null); }
