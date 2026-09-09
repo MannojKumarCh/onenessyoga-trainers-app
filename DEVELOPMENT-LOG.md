@@ -2,7 +2,7 @@
 
 A living record of features and fixes implemented via Claude Code sessions. Update this file as work continues; don't let it go stale.
 
-Last updated: 2026-08-23
+Last updated: 2026-09-09
 
 ---
 
@@ -721,4 +721,12 @@ All 4 dev accounts (`admin@oneness.yoga` / super_admin, `devseqcre@guysmail.com`
 6. ~~Add `OPENROUTER_API_KEY`~~ — **done**, key is live on dev, real generations working (see §9). Sequence Creator can now also turn a generated plan directly into real sequences (`POST /sequences/bulk`). Still open: a live browser/DOM click-through of the editable AI-plan modal (Playwright unavailable in-session throughout), and validating `google/gemma-4-31b-it:free`'s real output quality specifically (blocked by transient free-tier provider throttling at time of writing — `nvidia/nemotron-3-ultra-550b-a55b:free` is currently configured instead, already validated).
 7. ~~Not started: prod deployment of everything in §9 (AI scheduler + bulk-create)~~ — **done** (see §18). AI scheduler *code* is live on prod, but `OPENROUTER_API_KEY`/`OPENROUTER_MODEL` still need to be added to prod's `.env` before it's actually usable there (fails gracefully with a 503 until then).
 8. ~~Not started: prod deployment of multi-role support (§10)~~ — **done** (see §18), live on prod. **Still not yet verified**: live browser/DOM check of the merged nav for a multi-role account (Playwright unavailable in-session).
-9. **Action needed from user**: add `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` to prod's `.env` and restart `oneness-yoga-prod-api` to activate the AI weekly-schedule generator there (see §18).
+9. ~~Action needed from user: add `OPENROUTER_API_KEY`/`OPENROUTER_MODEL` to prod's `.env`~~ — **superseded** (see §35): the AI weekly-schedule generator was switched from OpenRouter to the Anthropic API directly; `ANTHROPIC_API_KEY` is live on both dev and prod.
+
+---
+
+## Phase 1 complete (2026-09-09)
+
+All planned Phase 1 functionality is built, tested, and live on both `tdev.onenessyoga.in` and `trainers.onenessyoga.in`: the three original roles (super_admin, sequence_creator, trainer) plus the newer Kids Yoga Trainer role; the full session/sequence/leave/resource workflow; the recurring Weekly Schedule + backup-trainer system; AI-assisted weekly scheduling and AI-generated (or manually built) Kids Yoga sessions; Google Sheets/Drive integration; push notifications; and app-wide pull-to-refresh. The "Known gaps" list above is largely resolved or superseded at this point - anything still genuinely open is marked inline above rather than repeated here.
+
+No further feature work is planned for now. Future sessions with Claude Code on this project will be bug fixes/small tweaks as they come up - each one should still get its own dated section above and a commit pushed to both `dev` and `main`, following the same pattern as everything before it.
