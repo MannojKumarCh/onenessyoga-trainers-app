@@ -40,6 +40,8 @@
 
 html, body {
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-feature-settings: 'cv11', 'ss01';
   -webkit-font-smoothing: antialiased;
