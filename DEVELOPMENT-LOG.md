@@ -688,6 +688,19 @@ Four improvements to the "Build Sequence" modal (`SequenceDetail.jsx`), used by 
 
 Backend-verified on dev (heading + non-heading rows persist and round-trip correctly, Sheet sync confirmed). Migration backed-up-then-applied on both dev and prod the same day; no schema change needed for the follow-up 1.5s→3s autosave-delay tweak (frontend constant only).
 
+## 39. Pull-to-refresh, app-wide - PWA and plain browser tab alike (2026-09-09)
+
+Neither installed/standalone PWA mode nor this app's own scroll structure gets a native pull-to-refresh: iOS home-screen PWAs have no such gesture at all, and every page here scrolls inside its own `.page` div (not the document/`body`), which is the only thing browsers' built-in gesture watches - so it had to be built by hand rather than relying on the platform either way.
+
+- New `frontend/src/hooks/usePullToRefresh.js`: `usePullToRefreshGesture()` attaches native (non-passive) touch listeners once, on the single wrapper `AppLayout` already puts around `<Outlet/>` - arms only when a touch starts on a `.page` element already scrolled to top, `preventDefault()`s during an active pull so the browser's own bounce/refresh never fires alongside it, and renders a small spinner that rotates with pull progress before spinning for real past the 70px threshold.
+- `useRegisterPullRefresh(fn)`: every page already has its own `load()`/refetch function (used for the existing 30s auto-poll) - this just registers it as "the thing to call" for whichever page is currently on screen, so the one gesture handler in `AppLayout` doesn't need to know anything about any specific page. Passing `null` skips registering for that render without clobbering a nested child's registration - needed for `admin/Sessions.jsx`, whose three tabs render `WeeklySchedule`/`MySessions` as actual mount/unmount, each registering its own refresh only while its own tab is showing.
+- Every page's `load` now `return`s its fetch promise (previously discarded, harmless since `usePolling` already ignored the return value) so the pull indicator's spinner tracks real completion instead of a guessed timeout.
+- `.page` gets `overscroll-behavior-y: contain` so a plain mobile browser tab's own native pull-to-refresh doesn't double-fire alongside this one - a non-issue in standalone PWA mode, which has no such native gesture to begin with.
+
+Chosen over the simpler alternative (`window.location.reload()` on every pull) specifically for a smooth, flash-free refresh and because switching to a different bottom-nav tab was already confirmed unaffected either way - every page already fetches its own fresh data on mount regardless of what any other page's pull-to-refresh did.
+
+Deployed to dev (`tdev.onenessyoga.in`) - frontend-only change, no backend/schema touched, just a rebuild.
+
 ---
 
 ## Dev environment data reset (2026-08-20)
