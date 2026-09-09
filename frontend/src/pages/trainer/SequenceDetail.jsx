@@ -365,6 +365,7 @@ export default function SequenceDetail() {
                       <button type="button" onClick={() => insertBuilderRowAbove(index)} aria-label={`Insert row above ${index + 1}`} title="Insert Row Above" style={rowActionBtn}>
                         <ArrowUpIcon style={{ width: 12, height: 12 }} />
                       </button>
+                      <PlusIcon style={{ width: 9, height: 9, color: 'var(--text-secondary)', margin: '1px auto' }} />
                       <button type="button" onClick={() => insertBuilderRowBelow(index)} aria-label={`Insert row below ${index + 1}`} title="Insert Row Below" style={rowActionBtn}>
                         <ArrowDownIcon style={{ width: 12, height: 12 }} />
                       </button>
