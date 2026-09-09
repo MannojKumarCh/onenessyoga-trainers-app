@@ -5,7 +5,7 @@ import client from '../../api/client';
 import { format } from 'date-fns';
 import Modal from '../../components/Modal';
 import { getApiErrorMessage } from '../../utils/apiError';
-import { ExclamationTriangleIcon, ArrowLeftIcon, PlusIcon, XMarkIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, ArrowLeftIcon, PlusIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
 import usePolling from '../../hooks/usePolling';
 import { useRegisterPullRefresh } from '../../hooks/usePullToRefresh';
 import { useToast } from '../../context/ToastContext';
@@ -133,6 +133,10 @@ export default function SequenceDetail() {
 
   function insertBuilderRowAbove(index) {
     setBuilderItems(items => [...items.slice(0, index), { ...EMPTY_ITEM }, ...items.slice(index)]);
+  }
+
+  function insertBuilderRowBelow(index) {
+    setBuilderItems(items => [...items.slice(0, index + 1), { ...EMPTY_ITEM }, ...items.slice(index + 1)]);
   }
 
   function removeBuilderRow(index) {
@@ -347,19 +351,27 @@ export default function SequenceDetail() {
             </div>
 
             <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1.5fr 34px', minWidth: 480 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1.5fr 30px 30px', minWidth: 500 }}>
                 <div style={sheetHeaderCell}>Exercise</div>
                 <div style={sheetHeaderCell}>Remarks</div>
                 <div style={sheetHeaderCell}>Reference</div>
+                <div style={sheetHeaderCell} />
                 <div style={{ ...sheetHeaderCell, borderRight: 'none' }} />
 
                 {builderItems.map((item, index) => {
                   const isLast = index === builderItems.length - 1;
-                  const rowActions = (
-                    <div style={{ ...sheetCell(isLast), display: 'flex', borderRight: 'none', flexDirection: 'column', gap: 2, padding: 4 }}>
+                  const insertBox = (
+                    <div style={{ ...sheetCell(isLast), display: 'flex', flexDirection: 'column', gap: 2, padding: 4 }}>
                       <button type="button" onClick={() => insertBuilderRowAbove(index)} aria-label={`Insert row above ${index + 1}`} title="Insert Row Above" style={rowActionBtn}>
                         <ArrowUpIcon style={{ width: 12, height: 12 }} />
                       </button>
+                      <button type="button" onClick={() => insertBuilderRowBelow(index)} aria-label={`Insert row below ${index + 1}`} title="Insert Row Below" style={rowActionBtn}>
+                        <ArrowDownIcon style={{ width: 12, height: 12 }} />
+                      </button>
+                    </div>
+                  );
+                  const headingRemoveBox = (
+                    <div style={{ ...sheetCell(isLast), display: 'flex', borderRight: 'none', flexDirection: 'column', gap: 2, padding: 4 }}>
                       <button type="button" onClick={() => toggleBuilderHeading(index)} aria-label={`Toggle heading for row ${index + 1}`} title="Toggle Sub-heading" style={{ ...rowActionBtn, fontWeight: 700, color: item.is_heading ? 'var(--primary)' : 'var(--text-secondary)' }}>
                         H
                       </button>
@@ -387,7 +399,8 @@ export default function SequenceDetail() {
                           value={item.name}
                           onChange={e => updateBuilderItem(index, 'name', e.target.value)}
                         />
-                        {rowActions}
+                        {insertBox}
+                        {headingRemoveBox}
                       </div>
                     );
                   }
@@ -447,7 +460,8 @@ export default function SequenceDetail() {
                           </>
                         )}
                       </div>
-                      {rowActions}
+                      {insertBox}
+                      {headingRemoveBox}
                     </div>
                   );
                 })}

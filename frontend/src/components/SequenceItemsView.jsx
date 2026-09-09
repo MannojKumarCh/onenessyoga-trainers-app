@@ -20,6 +20,10 @@ export default function SequenceItemsView({ items }) {
 
   if (!items || items.length === 0) return null;
 
+  // Numbering skips heading rows and keeps counting across them, rather than
+  // resetting per section.
+  let number = 0;
+
   return (
     <>
       {items.map((item, i) => item.is_heading ? (
@@ -31,7 +35,7 @@ export default function SequenceItemsView({ items }) {
           key={item.id}
           style={{ padding: '10px 0', borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none' }}
         >
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{item.name}</div>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{++number}. {item.name}</div>
           {item.remarks && (
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 2 }}>{item.remarks}</div>
           )}
