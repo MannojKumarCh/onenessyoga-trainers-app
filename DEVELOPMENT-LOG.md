@@ -701,6 +701,15 @@ Chosen over the simpler alternative (`window.location.reload()` on every pull) s
 
 Deployed to dev (`tdev.onenessyoga.in`) - frontend-only change, no backend/schema touched, just a rebuild.
 
+## 40. Sequence builder follow-up: insert row below, restored numbering (2026-09-09)
+
+Two regressions/gaps found using the builder after §38's sub-heading work landed:
+
+- **Only "insert above" existed** (added in §38), so adding several rows in a row still meant repeatedly clicking a button on the row you'd just added rather than the one below it, or going back to the top "+ Add Row" button once a list got long. Each row's single action column is now split into two boxes: an insert box (up arrow / a small `+` / down arrow - insert directly above or below that row) and a second box for the existing "H" (toggle sub-heading) and "x" (remove) - both reachable from any row, no scrolling required.
+- **Row numbers had silently disappeared** from the read-only "Sequence Content" view (`SequenceItemsView.jsx`) when it was written for §38 - the original `{i + 1}. {name}` numbering wasn't carried over. Restored, with heading rows excluded from the count and numbering continuing across them (not resetting per section) - e.g. a "Warm-Up" heading followed by 3 poses, then a "Cool-Down" heading followed by 2 more, numbers 1-5 straight through.
+
+Frontend-only, no backend/schema change. Deployed to dev then prod the same day.
+
 ---
 
 ## Dev environment data reset (2026-08-20)
