@@ -228,7 +228,8 @@ export default function SequenceDetail() {
     }
   }
 
-  const isAssigned = String(seq?.assigned_trainer_id) === String(user?.id);
+  const isAdmin = user?.roles?.includes('super_admin');
+  const isAssigned = isAdmin || String(seq?.assigned_trainer_id) === String(user?.id);
 
   if (loadError) return <div className="empty-state"><div style={{ display: 'flex', justifyContent: 'center' }}><ExclamationTriangleIcon style={{ width: 48, height: 48, color: 'var(--text-secondary)' }} /></div><p>Couldn't load this sequence. Please try again.</p></div>;
   if (!seq) return <div className="loading">Loading…</div>;

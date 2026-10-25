@@ -313,23 +313,24 @@ async function markUploaded(id, link) {
   });
 }
 
-// Assigned trainer: upload Google Sheet link
-router.patch('/:id/upload', authenticate, requireRole('trainer', 'kids_yoga_trainer'), async (req, res) => {
+// Assigned trainer / admin: upload Google Sheet link
+router.patch('/:id/upload', authenticate, requireRole('trainer', 'kids_yoga_trainer', 'super_admin'), async (req, res) => {
   const { google_sheet_link } = req.body;
   if (!google_sheet_link) return res.status(400).json({ error: 'google_sheet_link required' });
 
   const id = parseInt(req.params.id);
   const seq = await prisma.sequence.findUnique({ where: { id } });
   if (!seq) return res.status(404).json({ error: 'Not found' });
-  if (seq.assigned_trainer_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+  const isAdmin = getUserRoles(req.user).includes('super_admin');
+  if (!isAdmin && seq.assigned_trainer_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
   await markUploaded(id, google_sheet_link.trim());
 
   res.json({ success: true });
 });
 
-// Assigned trainer: build sequence content in-app and auto-generate/update the Google Sheet
-router.post('/:id/build', authenticate, requireRole('trainer', 'kids_yoga_trainer'), async (req, res) => {
+// Assigned trainer / admin: build sequence content in-app and auto-generate/update the Google Sheet
+router.post('/:id/build', authenticate, requireRole('trainer', 'kids_yoga_trainer', 'super_admin'), async (req, res) => {
   const { items } = req.body;
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'items must be a non-empty array' });
@@ -346,7 +347,8 @@ router.post('/:id/build', authenticate, requireRole('trainer', 'kids_yoga_traine
     include: { assigned_trainer: { select: { name: true } } }
   });
   if (!seq) return res.status(404).json({ error: 'Not found' });
-  if (seq.assigned_trainer_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+  const isAdmin = getUserRoles(req.user).includes('super_admin');
+  if (!isAdmin && seq.assigned_trainer_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
 
   await prisma.$transaction([
     prisma.sequenceItem.deleteMany({ where: { sequence_id: id } }),
